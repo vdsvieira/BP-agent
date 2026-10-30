@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gente & Gestão · Bradesco</title>
+  <meta name="description" content="Plataforma integrada de pessoas: ATS, admissão, onboarding, metas e performance com IA.">
+  <link rel="stylesheet" href="assets/css/cockpit.css">
+  <link rel="stylesheet" href="assets/css/portal.css">
+  <link rel="stylesheet" href="assets/css/apple.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><img src="assets/brand/logo.svg" alt="" onerror="this.parentElement.textContent='B'"></div>
+        <div><strong>Gente & Gestão</strong><small>Bradesco · Plataforma de pessoas</small></div>
+      </div>
+      <nav class="nav" id="nav" aria-label="Módulos"></nav>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div class="row">
+          <button class="btn ghost menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+          <div><h1 id="titulo">Início</h1><div class="sub" id="subtitulo"></div></div>
+        </div>
+        <div class="toolbar user-box">
+          <span class="pill" id="perfilPill"></span>
+          <span id="userNome" class="small"></span>
+          <button class="btn icone-btn" id="temaBtn" title="Alternar aparência clara/escura" aria-label="Alternar aparência">☾</button>
+          <button class="btn" id="sairBtn">Sair</button>
+        </div>
+      </header>
+      <main class="content" id="view" tabindex="-1"><div class="loading">Carregando…</div></main>
+    </div>
+  </div>
+  <dialog id="modal">
+    <header><strong id="modalTitle"></strong><button class="btn ghost sm" data-close aria-label="Fechar">✕</button></header>
+    <div class="body" id="modalBody"></div>
+    <footer id="modalFoot"></footer>
+  </dialog>
+  <script src="assets/js/portal/core.js"></script>
+  <script src="assets/js/portal/ats.js"></script>
+  <script src="assets/js/portal/jornada.js"></script>
+  <script src="assets/js/portal/desempenho.js"></script>
+  <script src="assets/js/portal/inicio.js"></script>
+</body>
+</html>

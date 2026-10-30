@@ -22,6 +22,8 @@
     if (/^https?:/.test(location.protocol)) {
       try {
         const r = await fetch('api/dados', { cache: 'no-store' });
+        if (r.status === 401) { location.href = 'login.html#cockpit'; return new Promise(() => {}); } // exige login
+        if (r.status === 403) { location.href = 'portal.html'; return new Promise(() => {}); } // cockpit é só para RH/BP
         if (r.ok) { base = await r.json(); base.servidor = true; }
       } catch (e) { /* sem servidor: modo offline */ }
     }

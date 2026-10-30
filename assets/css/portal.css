@@ -1,0 +1,60 @@
+/* Portal de Gente & Gestão — complementa cockpit.css (mesmos tokens de marca e tema) */
+.login-page { background: var(--brand-grad); min-height: 100vh; }
+.login-wrap { display: grid; grid-template-columns: 1fr minmax(320px, 440px); gap: 40px; max-width: 1040px; margin: 0 auto; padding: 56px 24px; align-items: start; color: #fff; }
+.login-brand h1 { font-size: 34px; margin: 18px 0 8px; }
+.login-brand p { color: rgba(255, 255, 255, .88); max-width: 460px; font-size: 16px; }
+.brand-mark.big { width: 56px; height: 56px; font-size: 26px; background: #fff; color: var(--brand); }
+.login-card { color: var(--ink); }
+.form { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.form .field input, .form .field select, .form .field textarea { width: 100%; }
+.erro { color: var(--critical); min-height: 1em; margin: 0; font-size: 13px; }
+.demo-list { margin-top: 18px; border-top: 1px solid var(--grid); padding-top: 12px; }
+.demo-list h2 { font-size: 14px; margin: 0; }
+.demo-btn { all: unset; cursor: pointer; display: block; width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; }
+.demo-btn:hover, .demo-btn:focus-visible { border-color: var(--brand); background: var(--brand-soft); }
+.demo-btn b { display: block; font-size: 13px; }
+.demo-btn span { font-size: 12px; color: var(--ink-2); }
+
+.user-box { display: flex; align-items: center; gap: 10px; }
+.user-box .pill { background: rgba(255, 255, 255, .18); color: #fff; }
+.pipeline { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.pipeline .col { min-height: 140px; }
+.cand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; cursor: pointer; }
+.cand-card:hover { border-color: var(--brand); }
+.cand-card .nome { font-weight: 600; font-size: 13px; }
+.score { display: inline-block; min-width: 34px; text-align: center; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 1px 7px; background: var(--surface-2); }
+.score.alto { background: #dff3df; color: #064f06; } .score.medio { background: #fdf0d2; color: #6b4a00; } .score.baixo { background: #f9dede; color: #7c1515; }
+:root[data-theme="dark"] .score.alto { background: #12361a; color: #9fe39f; }
+:root[data-theme="dark"] .score.medio { background: #3a2e10; color: #f5d27a; }
+:root[data-theme="dark"] .score.baixo { background: #3d1515; color: #f5a3a3; }
+.stepper { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0; }
+.stepper span { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.stepper span.feito { background: var(--brand-soft); color: var(--brand-dark); }
+.stepper span.atual { background: var(--brand); color: #fff; font-weight: 600; }
+.progress { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--s3); }
+.okr { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); margin-bottom: 10px; }
+.okr .nivel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); font-weight: 700; }
+.okr h3 { margin: 2px 0 8px; font-size: 15px; }
+.okr .kr { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; align-items: center; font-size: 13px; padding: 4px 0; }
+.okr-filhos { margin-left: 22px; border-left: 2px solid var(--grid); padding-left: 12px; }
+.notas { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
+.notas .escala { display: flex; gap: 4px; }
+.notas .escala label { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; }
+.notas .escala input { position: absolute; opacity: 0; pointer-events: none; }
+.notas .escala input:checked + span { color: #fff; }
+.notas .escala label:has(input:checked) { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ia-box { background: var(--brand-soft); border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 13px; }
+.ia-box h4 { margin: 0 0 6px; font-size: 13px; }
+.tarefa { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.tarefa:last-child { border-bottom: 0; }
+.tarefa.feito .t { text-decoration: line-through; color: var(--muted); }
+.fase { margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--brand-dark); text-transform: uppercase; letter-spacing: .04em; }
+:root[data-theme="dark"] .fase { color: var(--accent); }
+.distrib { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; align-items: end; height: 140px; }
+.distrib div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; font-size: 12px; }
+.distrib .b { width: 60%; background: var(--s1); border-radius: 4px 4px 0 0; min-height: 2px; }
+.distrib .ref { width: 60%; border-top: 2px dashed var(--ink-2); }
+.vaga-card { cursor: pointer; }
+.vaga-card:hover { border-color: var(--brand); }
+@media (max-width: 820px) { .login-wrap { grid-template-columns: 1fr; padding-top: 24px; } .okr .kr { grid-template-columns: 1fr; } }

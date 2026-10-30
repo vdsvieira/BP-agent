@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · Gente & Gestão</title>
+  <link rel="stylesheet" href="assets/css/cockpit.css">
+  <link rel="stylesheet" href="assets/css/portal.css">
+  <link rel="stylesheet" href="assets/css/apple.css">
+</head>
+<body class="login-page">
+  <main class="login-wrap">
+    <section class="login-brand">
+      <div class="brand-mark big"><img src="assets/brand/logo.svg" alt="" onerror="this.parentElement.textContent='B'"></div>
+      <h1>Gente & Gestão</h1>
+      <p>Plataforma integrada de pessoas: recrutamento, admissão, onboarding, metas, performance e o Cockpit do BP — com IA em cada etapa.</p>
+      <p class="small">Protótipo com dados simulados.</p>
+    </section>
+    <section class="card login-card">
+      <div class="chips" role="tablist">
+        <button class="chip" id="tabEntrar" aria-pressed="true">Entrar</button>
+        <button class="chip" id="tabCadastro" aria-pressed="false">Sou candidato(a) — criar conta</button>
+      </div>
+      <form id="fEntrar" class="form">
+        <label class="field">Login ou e-mail<input type="text" id="login" autocomplete="username" required></label>
+        <label class="field">Senha<input type="password" id="senha" autocomplete="current-password" required></label>
+        <button class="btn primary" type="submit">Entrar</button>
+        <p class="erro" id="erroEntrar" role="alert"></p>
+      </form>
+      <form id="fCadastro" class="form" hidden>
+        <label class="field">Nome completo<input type="text" id="cNome" required></label>
+        <label class="field">E-mail<input type="email" id="cEmail" autocomplete="email" required></label>
+        <label class="field">Senha (mínimo 8 caracteres)<input type="password" id="cSenha" minlength="8" autocomplete="new-password" required></label>
+        <button class="btn primary" type="submit">Criar conta e ver vagas</button>
+        <p class="erro" id="erroCadastro" role="alert"></p>
+      </form>
+      <div id="demo" class="demo-list"></div>
+    </section>
+  </main>
+  <script>
+  (function () {
+    'use strict';
+    const $ = (s) => document.querySelector(s);
+    const destino = (perfil) => { location.href = (perfil === 'bp' || perfil === 'rh') && /cockpit/.test(location.hash) ? 'index.html' : 'portal.html'; };
+    async function post(url, corpo) {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.erro || 'Erro ' + r.status);
+      return j;
+    }
+    async function entrar(login, senha) {
+      $('#erroEntrar').textContent = '';
+      try { const r = await post('api/auth/login', { login, senha }); destino(r.perfil); } catch (e) { $('#erroEntrar').textContent = e.message; }
+    }
+    $('#fEntrar').addEventListener('submit', (e) => { e.preventDefault(); entrar($('#login').value.trim(), $('#senha').value); });
+    $('#fCadastro').addEventListener('submit', async (e) => {
+      e.preventDefault(); $('#erroCadastro').textContent = '';
+      try { await post('api/auth/cadastro', { nome: $('#cNome').value, email: $('#cEmail').value, senha: $('#cSenha').value }); location.href = 'portal.html'; }
+      catch (err) { $('#erroCadastro').textContent = err.message; }
+    });
+    const aba = (cad) => { $('#fEntrar').hidden = cad; $('#fCadastro').hidden = !cad; $('#tabEntrar').setAttribute('aria-pressed', !cad); $('#tabCadastro').setAttribute('aria-pressed', cad); };
+    $('#tabEntrar').addEventListener('click', () => aba(false));
+    $('#tabCadastro').addEventListener('click', () => aba(true));
+    const PAPEL = { bp: 'HR Business Partner', rh: 'RH (recrutamento, DP, performance)', gestor: 'Gestor(a)', colaborador: 'Colaborador(a)', candidato: 'Candidato(a) externo(a)' };
+    fetch('api/auth/demo').then((r) => r.json()).then((contas) => {
+      if (!Array.isArray(contas) || !contas.length) return;
+      $('#demo').innerHTML = '<h2>Entrar com uma conta de demonstração</h2><p class="small muted">Senha de todas: demo123</p>' + contas.map((c) =>
+        `<button class="demo-btn" data-l="${c.login}"><b>${PAPEL[c.perfil] || c.perfil}${c.login === 'novo' ? ' · recém-contratado(a)' : ''}</b><span>${c.nome.replace(/</g, '&lt;')}${c.cargo ? ' · ' + c.cargo.replace(/</g, '&lt;') : ''}</span></button>`).join('');
+      document.querySelectorAll('.demo-btn').forEach((b) => b.addEventListener('click', () => entrar(b.dataset.l, 'demo123')));
+    }).catch(() => { $('#demo').innerHTML = '<p class="small muted">Servidor indisponível. Inicie com iniciar.bat.</p>'; });
+  })();
+  </script>
+</body>
+</html>

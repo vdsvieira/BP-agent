@@ -69,7 +69,8 @@ def conectar(somente_leitura: bool = False) -> sqlite3.Connection:
     if somente_leitura:
         con = sqlite3.connect(f"file:{ARQUIVO}?mode=ro", uri=True, check_same_thread=False)
     else:
-        con = sqlite3.connect(ARQUIVO, check_same_thread=False)
+        con = sqlite3.connect(ARQUIVO, check_same_thread=False, timeout=30)
+        con.execute("PRAGMA journal_mode=WAL")  # leituras não bloqueiam escritas (várias pessoas usando ao mesmo tempo)
     con.row_factory = sqlite3.Row
     return con
 

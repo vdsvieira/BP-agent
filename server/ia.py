@@ -140,3 +140,47 @@ def diagnostico() -> int:
             return 1
     print("Tudo certo: a IA está acessível.")
     return 0
+
+
+# ------------------------------------------------------------------ IA estruturada dos módulos
+SISTEMA_MODULOS = ("Você é a IA da plataforma de Gente & Gestão do Bradesco (protótipo). Escreva em português do Brasil, tom profissional e humano. "
+                   "Não invente fatos sobre pessoas; quando faltar informação, diga o que falta. Respeite a LGPD e práticas antidiscriminatórias: "
+                   "nunca use gênero, idade, raça, estado civil, deficiência, religião, foto ou endereço como critério. "
+                   "Suas saídas são SUGESTÕES para uma pessoa revisar e decidir.\n\n")
+
+
+def gerar(instrucoes: str, entrada, esquema: dict, effort: str = "low", max_tokens: int = 12000) -> dict:
+    """Chamada única com saída JSON garantida pelo esquema. `entrada` é texto ou lista de blocos (PDF/imagem + texto).
+    Erros viram rotas.Erro com mensagem acionável (chave, proxy, créditos…)."""
+    import json as _json
+    from .rotas import Erro
+
+    conteudo = entrada if isinstance(entrada, list) else [{"type": "text", "text": str(entrada)}]
+    try:
+        resp = cliente().beta.messages.create(
+            model=MODELO, max_tokens=max_tokens, system=SISTEMA_MODULOS + instrucoes,
+            output_config={"effort": effort, "format": {"type": "json_schema", "schema": esquema}},
+            betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+            messages=[{"role": "user", "content": conteudo}],
+        )
+    except Exception as e:  # noqa: BLE001 — traduzido para o usuário logo abaixo
+        registrar_erro("módulo", e)
+        codigo, msg = explicar_erro(e)
+        raise Erro(codigo, msg) from e
+    if resp.stop_reason == "refusal":
+        raise Erro(422, "A IA não pôde atender este pedido. Reformule com foco profissional.")
+    if resp.stop_reason == "max_tokens":
+        raise Erro(502, "A resposta da IA ficou longa demais e foi cortada. Tente um pedido mais específico.")
+    return _json.loads(next(b.text for b in resp.content if b.type == "text"))
+
+
+def obj(props: dict, obrig: list | None = None) -> dict:
+    """Atalho para esquemas JSON estritos."""
+    return {"type": "object", "properties": props, "required": obrig if obrig is not None else list(props), "additionalProperties": False}
+
+
+S, N, I, B = {"type": "string"}, {"type": "number"}, {"type": "integer"}, {"type": "boolean"}
+
+
+def lista(item) -> dict:
+    return {"type": "array", "items": item}

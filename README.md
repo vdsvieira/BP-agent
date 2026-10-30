@@ -1,6 +1,13 @@
-# Cockpit do BP · Bradesco
+# Gente & Gestão · Bradesco
 
-Cockpit do HR Business Partner estratégico. Reúne a telemetria das diretorias atendidas, people analytics preditivo, indicadores estratégicos modernos, org design, clima e bem-estar, orçamento, vagas e WFP. Os subsistemas de RH ficam interligados. Inclui um **assistente de IA** (Claude) com três modos — Analista, Materiais e Coach — que trabalha sobre toda a base de pessoas e sobre os arquivos que você enviar.
+Plataforma integrada de pessoas (protótipo funcional), com IA em cada etapa. São dois produtos sobre a mesma base:
+
+1. **Portal de Gente & Gestão:** ATS, admissão, onboarding, metas (OKRs) e performance, com login por perfil (RH, BP, gestor, colaborador e candidato).
+2. **Cockpit do BP:** a visão analítica e estratégica, descrita mais abaixo.
+
+Tudo é integrado. Quem é contratado no ATS vira colaborador na base do cockpit. As notas calibradas atualizam desempenho e potencial (e o modelo de risco). Os OKRs das tribos alimentam o indicador de negócio. As vagas do cockpit vêm do ATS.
+
+O Cockpit do BP é o painel do HR Business Partner estratégico. Reúne a telemetria das diretorias atendidas, people analytics preditivo, indicadores estratégicos modernos, org design, clima e bem-estar, orçamento, vagas e WFP. Os subsistemas de RH ficam interligados. Inclui um **assistente de IA** (Claude) com três modos — Analista, Materiais e Coach — que trabalha sobre toda a base de pessoas e sobre os arquivos que você enviar.
 
 > O projeto vem com um **ambiente simulado**: cerca de 2.660 colaboradores fictícios em 8 diretorias e 18 tribos, com hierarquia, clima, licenças, movimentações, ATS e contexto de negócio. Nenhum dado real é incluído.
 
@@ -8,8 +15,21 @@ Cockpit do HR Business Partner estratégico. Reúne a telemetria das diretorias 
 
 | Situação | O que fazer |
 |---|---|
-| **Completo** (IA, conectores, upload de Excel/PDF/imagens) | Windows: duplo clique em `iniciar.bat`. Linux/macOS: `./iniciar.sh`. Depois acesse **http://localhost:8765** |
-| Só olhar (offline, sem IA) | Duplo clique em `index.html` (usa `data/base_demo.js`) |
+| **Completo** (portal, cockpit, IA, conectores, uploads) | Windows: duplo clique em `iniciar.bat`. Linux/macOS: `./iniciar.sh`. O navegador abre em **http://localhost:8765** (tela de login) |
+| Só o cockpit, offline e sem IA | Duplo clique em `index.html` (usa `data/base_demo.js`) |
+
+Na tela de login, escolha uma **conta de demonstração**. A senha de todas é `demo123`:
+
+| Conta | Quem é | O que experimentar |
+|---|---|---|
+| `bp` | Você, HRBP | Início com pendências, Cockpit do BP, calibração, ciclos |
+| `rh` | RH (recrutamento, DP, performance) | Aprovar vagas, triar com IA, fazer proposta, validar documentos, efetivar admissão |
+| `gestor` | Gerente de Tecnologia | Requisitar vaga com IA, entrevistar a candidata demo, avaliar o time, acompanhar onboarding |
+| `colaborador` | Pessoa do time do gestor | Autoavaliação, metas com IA, feedbacks, vagas internas (mobilidade) |
+| `novo` | Recém-contratado(a) | Plano 30-60-90, tarefas e check-in de experiência |
+| `candidato` | Candidata externa em fase final | Mural de vagas, currículo lido por IA, proposta, envio de documentos |
+
+Na tela de login também dá para criar uma conta nova de candidato.
 
 Requisitos: Python 3.10+. Para a IA, defina `ANTHROPIC_API_KEY` (ou rode `ant auth login`) antes de iniciar. Sem chave, tudo funciona, exceto o assistente e a leitura de PDF/imagens.
 
@@ -23,7 +43,31 @@ python -m server --exportar-demo          # regenera data/base_demo.js (modo off
 
 As rotinas podem ser agendadas no Agendador de Tarefas do Windows ou no cron. Exemplo: toda segunda às 7h40 → `python -m server --rotina briefing`. Os materiais gerados ficam em `server/saidas/`.
 
-## Módulos
+## Portal de Gente & Gestão
+
+O design segue os princípios do Human Interface Guidelines da Apple:
+- **Visual:** tipografia de sistema, títulos grandes, listas agrupadas, controles segmentados e barras translúcidas.
+- **Marca:** o vermelho Bradesco aparece como cor de destaque.
+- **Experiência:** cada perfil começa no **Início**, uma lista curta do que precisa ser feito agora, em que cada item leva direto à tela certa. Telas com várias ações mostram um único **"Próximo passo"** recomendado.
+
+| Módulo | O que faz | IA |
+|---|---|---|
+| **ATS** | O gestor requisita a vaga e o RH aprova e publica. Candidatos externos e internos (mobilidade) se inscrevem. O processo segue por pipeline, entrevistas com scorecard e proposta até o aceite | Redige a vaga e aponta viés no briefing. Lê o currículo (PDF/imagem). Faz a triagem requisito a requisito com o **perfil anonimizado**. Monta o roteiro de entrevista estruturada e a carta-proposta |
+| **Admissão** | Aberta automaticamente no aceite. Traz o checklist por responsável (candidato, RH, TI, gestor), os documentos e a efetivação, que gera a matrícula e converte o login do candidato | Confere se o documento é o pedido, está legível e está na validade, sem transcrever dados pessoais |
+| **Onboarding** | Plano 30-60-90, buddy, tarefas por responsável e check-ins de 7/30/60/90 dias (confidenciais) | Personaliza o plano para o cargo e a tribo. Lê os check-ins e sinaliza risco de saída precoce, com sugestões ao gestor |
+| **Metas (OKRs)** | Cascata empresa → diretoria → tribo → pessoa, com check-ins de progresso e confiança | Sugere OKRs alinhados ao objetivo-pai e avalia a qualidade (resultado × tarefa) |
+| **Performance** | Ciclos com autoavaliação, avaliação do gestor e de pares (nota ponderada 70/15/15), calibração com curva de referência, PDI e feedback contínuo | Revisa textos de feedback (viés de linguagem, modelo SBI, falta de evidência). Sintetiza as avaliações. Propõe PDI 70-20-10 |
+
+**Segurança do protótipo:**
+- Senhas guardadas com PBKDF2. Sessão em cookie `HttpOnly` e `SameSite=Strict`. A API só aceita JSON.
+- Todas as rotas checam o perfil no servidor. Exemplos:
+  - O gestor não vê candidatos de vagas de outros gestores nem os documentos de admissão.
+  - O buddy vê o plano de onboarding, mas não os check-ins.
+  - O avaliado só vê a avaliação do gestor depois do encerramento do ciclo.
+  - O cockpit e o assistente de IA são exclusivos de RH/BP.
+- Em produção, o login de funcionários passa a ser o SSO corporativo.
+
+## Cockpit do BP — módulos
 
 **Cockpit**
 - **Visão geral:** KPIs com farol, Org Health Index, receita/FTE, alertas prioritários, agenda do BP e matriz por diretoria.
@@ -81,6 +125,13 @@ Para ligar uma fonte:
 O restante do cockpit, do modelo preditivo e do assistente não muda.
 
 ## Arquitetura
+
+```
+login.html, portal.html      portal de Gente & Gestão (assets/js/portal/: core, ats, jornada, desempenho, inicio)
+assets/css/apple.css         camada visual inspirada na Apple, aplicada a todas as páginas
+server/auth.py, rotas.py     login, sessões e roteador com controle de acesso por perfil
+server/plataforma/           módulos: ats, admissao, onboarding, metas, performance, arquivos
+```
 
 ```
 index.html, assets/          front-end (sem build). Identidade visual em assets/css/cockpit.css; logotipo em assets/brand/
