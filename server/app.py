@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from . import banco, conectores, ingestao
+from . import banco, conectores, ia, ingestao
 
 RAIZ = Path(__file__).resolve().parent.parent
 PUBLICO = ("index.html", "assets/", "data/")  # o banco SQLite e o código do servidor não são servidos
@@ -73,7 +73,7 @@ class Handler(BaseHTTPRequestHandler):
             con = banco.conectar()
             try:
                 if caminho == "/api/saude":
-                    return self._json(200, {"ok": True, "ia": bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") or os.environ.get("ANTHROPIC_PROFILE")) or None})
+                    return self._json(200, {"ok": True, "ia": ia.status_credencial()})
                 if caminho == "/api/dados":
                     return self._json(200, banco.montar_base_front(con))
                 if caminho == "/api/catalogo":
@@ -122,13 +122,10 @@ class Handler(BaseHTTPRequestHandler):
                     ag = agente()
                     r = ag.conversar(str(corpo.get("sessao", "padrao")), corpo.get("modo", "analista"), corpo.get("mensagem", ""), corpo.get("contexto", ""))
                     return self._json(200, r)
-                except Exception as e:
-                    import anthropic
-                    if isinstance(e, anthropic.AuthenticationError) or "api_key" in str(e).lower() or "authentication" in str(e).lower():
-                        return self._json(503, {"erro": "IA não configurada: defina ANTHROPIC_API_KEY (ou rode 'ant auth login') e reinicie o servidor."})
-                    if isinstance(e, anthropic.APIError):
-                        return self._json(502, {"erro": f"Falha na API do Claude: {e}"})
-                    raise
+                except Exception as e:  # classifica pelo tipo/código HTTP e mostra a causa real
+                    ia.registrar_erro("chat", e)
+                    codigo, msg = ia.explicar_erro(e)
+                    return self._json(codigo, {"erro": msg})
             return self._json(404, {"erro": "rota inexistente"})
         except (ValueError, KeyError) as e:
             return self._json(400, {"erro": str(e)})
@@ -162,7 +159,12 @@ def main() -> None:
     ap.add_argument("--pergunta")
     ap.add_argument("--modo", default="analista", choices=["analista", "materiais", "coach"])
     ap.add_argument("--rotina", help="briefing | pautas | retencao | org-health")
+    ap.add_argument("--diagnostico", action="store_true", help="Testa credencial, proxy e conexão com a IA")
     a = ap.parse_args()
+    ia.carregar_env()  # chave e proxy podem vir de um arquivo .env na pasta do cockpit
+
+    if a.diagnostico:
+        sys.exit(ia.diagnostico())
 
     if a.reset and banco.ARQUIVO.exists():
         banco.ARQUIVO.unlink()
@@ -180,6 +182,7 @@ def main() -> None:
         return
     srv = ThreadingHTTPServer(("127.0.0.1", a.porta), Handler)  # só localhost: a base contém dados de pessoas
     print(f"Cockpit do BP em http://localhost:{a.porta}  (Ctrl+C para encerrar)")
+    print(f"IA: {ia.status_credencial()}  ·  problemas? rode: python -m server --diagnostico")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

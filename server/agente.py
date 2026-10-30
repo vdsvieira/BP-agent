@@ -12,9 +12,7 @@ import re
 import threading
 from pathlib import Path
 
-import anthropic
-
-from . import banco
+from . import banco, ia
 
 MODELO = "claude-opus-5-5"
 RAIZ = Path(__file__).resolve().parent.parent
@@ -95,7 +93,7 @@ class Sessao:
 
 class Agente:
     def __init__(self, effort: str = "medium"):
-        self.cliente = anthropic.Anthropic()
+        self.cliente = ia.cliente()
         self.effort = effort
         self.sessoes: dict[str, Sessao] = {}
 

@@ -110,6 +110,14 @@ Ele consulta a base **somente leitura** (uma consulta SELECT por vez, com limite
 - **Logotipo:** coloque o arquivo oficial em `assets/brand/logo.svg`. Obtenha-o com a área de Marca e não o versione em repositórios públicos.
 - **Gráficos:** usam uma paleta validada para daltonismo. O vermelho fica reservado à marca e ao status crítico.
 
+## Se a IA der erro
+
+O cockpit mostra a **causa real** do erro: chave ausente ou recusada, bloqueio do proxy/firewall do banco, limite de uso ou instabilidade da API. A janela do servidor registra os detalhes técnicos.
+
+Para checar tudo de uma vez, rode `iniciar.bat --diagnostico` (ou `python -m server --diagnostico`). O teste verifica a chave, o proxy e faz três chamadas mínimas à API.
+
+Se o `setx` não "pegar" em algumas aberturas, copie `.env.exemplo` para `.env` e cole a chave nele. É lido automaticamente e nunca vai para o Git. Se a TI indicar um proxy, ele também é configurado no `.env`.
+
 ## Governança e LGPD
 
 - O servidor só aceita conexões do próprio computador. A base fica em `server/dados/bp.db`, fora do controle de versão.

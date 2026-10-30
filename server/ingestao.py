@@ -16,7 +16,7 @@ import json
 import re
 import unicodedata
 
-from . import banco, conectores
+from . import banco, conectores, ia
 
 MODELO_IA = "claude-opus-5-5"
 LIMITE_BYTES = 25 * 1024 * 1024
@@ -195,8 +195,6 @@ PROMPT_DOC = ("Você apoia um HR Business Partner de banco. Extraia deste arquiv
 
 
 def _extrair_com_ia(nome: str, mime: str, dados: bytes) -> dict:
-    import anthropic
-
     b64 = base64.standard_b64encode(dados).decode()
     if mime == "application/pdf":
         bloco = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
@@ -204,7 +202,7 @@ def _extrair_com_ia(nome: str, mime: str, dados: bytes) -> dict:
         bloco = {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}}
     else:
         bloco = {"type": "text", "text": f"<arquivo nome='{nome}'>\n{dados.decode('utf-8', 'ignore')[:150000]}\n</arquivo>"}
-    resp = anthropic.Anthropic().messages.create(
+    resp = ia.cliente().messages.create(
         model=MODELO_IA, max_tokens=16000,
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": ESQUEMA_DOC}},
         messages=[{"role": "user", "content": [bloco, {"type": "text", "text": PROMPT_DOC}]}],
@@ -219,8 +217,9 @@ def ingerir_documento(con, nome: str, mime: str, dados: bytes) -> dict:
     try:
         ext = _extrair_com_ia(nome, mime, dados)
         erro = None
-    except Exception as e:  # sem chave de API, sem rede, arquivo ilegível…
-        ext, erro = None, str(e)
+    except Exception as e:  # sem chave de API, sem rede, proxy, arquivo ilegível…
+        ia.registrar_erro("leitura de documento", e)
+        ext, erro = None, ia.explicar_erro(e)[1]
     if ext is None:
         cur = con.execute("INSERT INTO documentos (nome, tipo_arquivo, tipo_documento, resumo, pontos_chave, extraido_json, tabelas_geradas, enviado_em) VALUES (?,?,?,?,?,?,?,?)",
                           (nome, mime, "não processado", f"Arquivo armazenado sem leitura por IA: {erro}", "[]", "{}", "[]", agora))
