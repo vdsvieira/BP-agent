@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cockpit do BP</title>
+  <meta name="description" content="Cockpit do HR Business Partner: telemetria, people analytics preditivo, orçamento, vagas, WFP, insights e automação.">
+  <link rel="stylesheet" href="assets/css/cockpit.css">
+  <!-- Chart.js 4.4.1 (MIT) embarcado: funciona offline e em redes corporativas sem CDN -->
+  <script src="assets/vendor/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">BP</div>
+        <div><strong>Cockpit do BP</strong><small>People Analytics & Gestão</small></div>
+      </div>
+      <nav class="nav" id="nav" aria-label="Módulos"></nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="row">
+          <button class="btn ghost menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+          <div>
+            <h1 id="viewTitle">Visão geral</h1>
+            <div class="sub" id="dataBadge"></div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label class="sr-only" for="areaSel">Área</label>
+          <select id="areaSel" aria-label="Área atendida"></select>
+          <button class="btn" id="themeBtn" title="Alternar tema">◐ Tema</button>
+        </div>
+      </header>
+      <main class="content" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <button class="btn primary copilot-fab" id="copilotFab">✦ Copiloto do BP</button>
+  <section class="copilot" id="copilot" aria-label="Copiloto do BP">
+    <header>
+      <div><strong>Copiloto do BP</strong><small id="copilotMode">Modo local</small></div>
+      <button class="btn ghost sm" id="copilotClose" aria-label="Fechar">✕</button>
+    </header>
+    <div class="msgs" id="copilotMsgs"></div>
+    <div class="suggest" id="copilotSuggest"></div>
+    <form id="copilotForm">
+      <input type="text" id="copilotInput" placeholder="Pergunte sobre suas áreas…" autocomplete="off" aria-label="Pergunta">
+      <button class="btn primary" type="submit">Enviar</button>
+    </form>
+  </section>
+
+  <dialog id="modal">
+    <header><strong id="modalTitle"></strong><button class="btn ghost sm" data-close aria-label="Fechar">✕</button></header>
+    <div class="body" id="modalBody"></div>
+    <footer id="modalFoot"></footer>
+  </dialog>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/analytics.js"></script>
+  <script src="assets/js/materiais.js"></script>
+  <script src="assets/js/views.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

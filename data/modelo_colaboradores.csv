@@ -1,0 +1,4 @@
+matricula;nome;area;cargo;nivel;lider;genero;raca;pcd;idade;tempo_casa_meses;salario;compa_ratio;meses_sem_aumento;meses_sem_promocao;desempenho;potencial;enps;he_mes;absenteismo_dias;ferias_vencidas;troca_gestor_12m;treinamentos_pendentes;modelo;posicao_chave;sucessor_pronto;skill;status;tipo_desligamento;mes_desligamento_idx
+F100001;Nome Exemplo Um;tecnologia;Engenheiro de Dados;Analista Sr;nao;F;Negra;nao;31;40;18500;0,92;14;26;4;3;8;12;3;0;nao;;Híbrido;nao;;Engenharia de Dados;ativo;;
+F100002;Nome Exemplo Dois;varejo-pf;Gerente de Relacionamento;Gerente;sim;M;Branca;nao;44;150;24000;1,03;6;18;3;2;9;6;2;1;sim;PLD/FT|LGPD;Presencial;sim;nao;Certificação CPA-20/CEA;ativo;;
+F100003;Nome Exemplo Tres;tecnologia;Engenheiro de Software;Analista Pl;nao;M;Branca;nao;27;22;13800;0,88;20;22;4;2;5;18;6;0;sim;;Remoto;nao;;Cloud & FinOps;desligado;Voluntário;7

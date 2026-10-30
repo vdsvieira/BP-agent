@@ -1,0 +1,3 @@
+id;area;cargo;nivel;motivo;abertura;dias_aberta;sla;etapa;candidatos;recrutador;orcada;salario_previsto;prioridade;diversidade
+REQ-0001;tecnologia;Engenheiro de Dados;Analista Sr;Reposição;2026-08-10;81;45;Entrevistas;14;Recrutador A;sim;21000;Alta;nao
+REQ-0002;varejo-pf;Gerente de Relacionamento;Analista Pl;Aumento de quadro;2026-10-01;29;40;Triagem;32;Recrutador B;sim;7800;Média;sim
