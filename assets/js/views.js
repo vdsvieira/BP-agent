@@ -41,6 +41,7 @@
       <div>${st(i.sev)}</div>
       <div class="d">${esc(i.detalhe)}</div>
       <div class="acao"><b>Ação:</b> ${esc(i.acao)}</div>
+      ${i.ferramentas && i.ferramentas.length ? `<div class="meta small"><span class="muted">Ferramentas sugeridas:</span> ${i.ferramentas.map((id) => { const t = (window.BP_FERRAMENTAS || []).find((x) => x.id === id); return t ? `<button class="ferr-chip" data-ferr="${id}" data-ins="${i.id}">${esc(t.nome)}</button>` : ''; }).join(' ')}</div>` : ''}
       <div class="meta">${mostrarArea ? `<span class="pill">${esc(i.areaNome)}</span>` : ''}${i.subsistemas.map((s) => `<span class="pill">${esc(s)}</span>`).join('')}
         ${i.impacto ? `<span class="small muted">Exposição: ${brl(i.impacto)}</span>` : ''}<span class="spacer"></span>
         <button class="btn sm" data-comm="${i.id}">✉ Comunicação</button>
@@ -50,6 +51,7 @@
   function bindInsightButtons(root, lista, ui) {
     root.querySelectorAll('[data-task]').forEach((b) => b.addEventListener('click', () => ui.criarTarefa(lista.find((i) => i.id === b.dataset.task))));
     root.querySelectorAll('[data-comm]').forEach((b) => b.addEventListener('click', () => ui.abrirComunicacao(lista.find((i) => i.id === b.dataset.comm))));
+    root.querySelectorAll('[data-ferr]').forEach((b) => b.addEventListener('click', () => ui.abrirFerramenta(b.dataset.ferr, lista.find((i) => i.id === b.dataset.ins))));
   }
 
   // ======================================================================
@@ -70,6 +72,8 @@
         ${tile('Vagas abertas', int(k.vagas), `${k.vagasForaSla} fora do SLA · ${Math.round(k.diasMedios)} dias em média`, LIMIAR.pctForaSla(k.pctForaSla))}
         ${tile('Forecast pessoal vs orçado', sinal(k.orc.varForecast), `${brl(k.orc.forecastAno)} de ${brl(k.orc.orcadoAno)}`, LIMIAR.varForecast(k.orc.varForecast))}
         ${tile('Treinamentos regulatórios', p100(k.treinamento, 1), `${int(k.feriasVencidas)} com férias vencidas`, LIMIAR.treinamento(k.treinamento))}
+        ${(() => { const e = A.estrategicos(S.base, S.area); return tile('Org Health Index', dec(e.ohi, 0), 'saúde organizacional 0–100 · ver Indicadores estratégicos', e.ohi < 55 ? 'critico' : e.ohi < 68 ? 'atencao' : 'ok')
+          + tile('Receita por FTE', e.receitaFTE ? brl(e.receitaFTE) : '—', `HC ROI ${e.hcRoi ? dec(e.hcRoi, 1) + 'x' : '—'} (tribos com receita)`); })()}
       </div>
       <div class="grid g2">
         ${card('Headcount mensal', 'Últimos 12 meses', canvas('chHc'))}
@@ -488,13 +492,13 @@
       ['regulatorio', 'Varredura de treinamentos regulatórios', 'Semanal · quarta', 'Cria cobrança com escalonamento'],
       ['risco', 'Monitor de risco de saída de talentos', 'Semanal · sexta', 'Cria stay interviews para novos talentos em risco'],
       ['vagas', 'Comitê de vagas fora do SLA', 'Semanal · terça', 'Cria pauta do comitê com R&S'],
-      ['snapshot', 'Exportar snapshot para o agente de IA', 'Sob demanda', 'Baixa JSON anonimizado para o agente Claude']
+      ['snapshot', 'Exportar snapshot de indicadores', 'Sob demanda', 'Baixa JSON anonimizado (KPIs, insights, riscos) para BI']
     ];
     const taskCard = (t) => {
       const feitos = t.passos.filter((p) => p.ok).length;
       const atrasada = t.status !== 'feito' && new Date(t.prazo) < hoje;
       return `<div class="task"><div class="tt">${esc(t.titulo)}</div>
-        <div class="tm">${esc(t.areaNome || '')} · ${esc((A.PLAYBOOKS[t.playbook] || {}).nome || t.playbook)} · prazo ${new Date(t.prazo).toLocaleDateString('pt-BR')} ${atrasada ? st('critico', 'atrasada') : ''}</div>
+        <div class="tm">${esc(t.areaNome || '')} · ${esc(t.playbookNome || (A.PLAYBOOKS[t.playbook] || {}).nome || t.playbook)} · prazo ${new Date(t.prazo).toLocaleDateString('pt-BR')} ${atrasada ? st('critico', 'atrasada') : ''}</div>
         ${t.alvo && t.alvo.length ? `<div class="small muted">${t.alvo.length} item(ns) na lista</div>` : ''}
         <ul>${t.passos.map((p, i) => `<li><label><input type="checkbox" data-step="${t.id}|${i}" ${p.ok ? 'checked' : ''}> ${esc(p.t)}</label></li>`).join('')}</ul>
         <div class="bar-inline"><span style="width:${feitos / t.passos.length * 100}%"></span></div>
@@ -551,8 +555,8 @@
         <button class="btn" id="copyMat">⧉ Copiar texto</button>
         <button class="btn" id="dlMat">⇩ HTML</button>
         <button class="btn primary" id="printMat">⎙ Imprimir / PDF</button>
-        ${S.agente ? '<button class="btn primary" id="iaMat">✦ Refinar com agente IA</button>' : ''}
-      </div><p class="hint" style="margin-top:8px">A área do material segue o filtro do topo. Os indivíduos aparecem apenas por matrícula. ${S.agente ? '' : 'Conecte o agente Claude (ver README) para narrativas redigidas por IA.'}</p></section>
+
+      </div><p class="hint" style="margin-top:8px">A área do material segue o filtro do topo. Os indivíduos aparecem apenas por matrícula. </p></section>
       <div id="docMat">${doc.html}</div>`;
     return {
       html, mount(root) {
@@ -561,8 +565,6 @@
         root.querySelector('#copyMat').addEventListener('click', () => { navigator.clipboard.writeText(root.querySelector('#docMat').innerText).then(() => ui.toast('Texto copiado')); });
         root.querySelector('#dlMat').addEventListener('click', () => ui.baixar(doc.titulo.replace(/[^\w\- ]+/g, '').trim() + '.html',
           `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>${esc(doc.titulo)}</title><style>body{font-family:system-ui,sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{padding:6px 8px;border-bottom:1px solid #e5e5e5;text-align:left}.num{text-align:right}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpis div{background:#f3f6fb;padding:10px;border-radius:6px}.kpis b{display:block;font-size:20px}h2{border-bottom:2px solid #2a78d6}</style>${doc.html}</html>`, 'text/html'));
-        const ia = root.querySelector('#iaMat');
-        if (ia) ia.addEventListener('click', () => ui.perguntarAgente(`Redija o material "${M.TIPOS[tipo]}" para ${areaNome(S, S.area)} em tom executivo, com mensagem principal, 3 prioridades e decisões solicitadas ao diretor. Use as ferramentas para buscar os números.`));
       }
     };
   };
@@ -586,12 +588,9 @@
           <div class="row small" style="margin:6px 0 12px"><a href="data/modelo_colaboradores.csv" download>Baixar modelo de colaboradores</a></div>
           <label class="field">Vagas<input type="file" id="fVagas" accept=".csv,text/csv"></label>
           <div class="row small" style="margin-top:6px"><a href="data/modelo_vagas.csv" download>Baixar modelo de vagas</a></div>`)}
-        ${card('Integração com o agente de IA', 'O agente Claude (Python) lê um snapshot agregado e anonimizado', `
+        ${card('Exportar indicadores', 'Snapshot agregado (KPIs, insights, riscos) em JSON para BI ou outras ferramentas', `
           <label class="row small"><input type="checkbox" id="anonSnap" checked> Anonimizar (remover nomes; manter só matrícula)</label>
-          <div class="row" style="margin-top:10px"><button class="btn primary" id="expSnap">⇩ Exportar snapshot.json</button></div>
-          <p class="small muted">Salve em <span class="mono">agent/snapshot.json</span> e rode <span class="mono">python agent/bp_agent.py</span>. Com <span class="mono">--serve</span>, o Copiloto deste cockpit passa a usar o agente.</p>
-          <p class="small">Status do agente: ${S.agente ? st('ok', 'conectado em ' + esc(S.agenteUrl)) : st('atencao', 'não conectado (copiloto em modo local)')}</p>
-          <div class="row"><input type="text" id="agUrl" value="${esc(S.agenteUrl)}" style="flex:1"><button class="btn" id="agTest">Testar conexão</button></div>`)}
+          <div class="row" style="margin-top:10px"><button class="btn primary" id="expSnap">⇩ Exportar snapshot.json</button></div>`)}
         ${card('Privacidade e governança (LGPD)', '', `<ul class="small">
           <li>Dados pessoais e sensíveis (raça, PcD, saúde) exigem base legal e finalidade definida — use o cockpit apenas para gestão de pessoas.</li>
           <li>Scores de risco são <b>estatísticos</b>: nunca usar como critério isolado para decisões de desligamento, promoção ou remuneração.</li>
@@ -605,11 +604,11 @@
         root.querySelector('#fColab').addEventListener('change', (e) => ui.importar(e.target.files[0], 'colaboradores'));
         root.querySelector('#fVagas').addEventListener('change', (e) => ui.importar(e.target.files[0], 'vagas'));
         root.querySelector('#expSnap').addEventListener('click', () => ui.exportarSnapshot(root.querySelector('#anonSnap').checked));
-        root.querySelector('#agTest').addEventListener('click', () => { S.agenteUrl = root.querySelector('#agUrl').value.trim(); ui.testarAgente(true); });
         root.querySelector('#showNames').addEventListener('change', (e) => { S.anon = !e.target.checked; ui.render(); });
       }
     };
   };
 
+  V._h = { tile, card, st, canvas, insightItem, bindInsightButtons, matriz, bindMatriz, LIMIAR, areaNome, int, sinal, esc };
   global.BPViews = V;
 })(window);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cockpit do BP</title>
+  <title>Cockpit do BP · Bradesco</title>
   <meta name="description" content="Cockpit do HR Business Partner: telemetria, people analytics preditivo, orçamento, vagas, WFP, insights e automação.">
   <link rel="stylesheet" href="assets/css/cockpit.css">
   <!-- Chart.js 4.4.1 (MIT) embarcado: funciona offline e em redes corporativas sem CDN -->
@@ -13,8 +13,9 @@
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">BP</div>
-        <div><strong>Cockpit do BP</strong><small>People Analytics & Gestão</small></div>
+        <!-- Coloque o logotipo oficial (fornecido pela área de Marca) em assets/brand/logo.svg -->
+        <div class="brand-mark"><img src="assets/brand/logo.svg" alt="" onerror="this.parentElement.textContent='B'"></div>
+        <div><strong>Cockpit do BP</strong><small>Bradesco · Gente & Gestão</small></div>
       </div>
       <nav class="nav" id="nav" aria-label="Módulos"></nav>
     </aside>
@@ -30,11 +31,14 @@
         </div>
         <div class="toolbar">
           <label class="sr-only" for="areaSel">Área</label>
-          <select id="areaSel" aria-label="Área atendida"></select>
+          <span class="status-pill" id="fontePill"></span>
+          <select id="areaSel" aria-label="Diretoria atendida"></select>
+          <label class="sr-only" for="triboSel">Tribo</label>
+          <select id="triboSel" aria-label="Tribo"></select>
           <button class="btn" id="themeBtn" title="Alternar tema">◐ Tema</button>
         </div>
       </header>
-      <main class="content" id="view" tabindex="-1"></main>
+      <main class="content" id="view" tabindex="-1"><div class="loading">Carregando base de pessoas…</div></main>
     </div>
   </div>
 
@@ -58,10 +62,12 @@
     <footer id="modalFoot"></footer>
   </dialog>
 
+  <script src="assets/js/ferramentas.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/analytics.js"></script>
   <script src="assets/js/materiais.js"></script>
   <script src="assets/js/views.js"></script>
+  <script src="assets/js/views2.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>

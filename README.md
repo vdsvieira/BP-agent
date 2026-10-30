@@ -1,72 +1,119 @@
-# Cockpit do BP
+# Cockpit do BP · Bradesco
 
-Cockpit para HR Business Partner de banco: telemetria das áreas atendidas, people analytics preditivo, orçamento de pessoal, vagas, WFP, subsistemas de RH interligados, insights automáticos, automação de rotinas e produção de materiais executivos — com um **agente Claude** opcional como copiloto.
+Cockpit do HR Business Partner estratégico. Reúne a telemetria das diretorias atendidas, people analytics preditivo, indicadores estratégicos modernos, org design, clima e bem-estar, orçamento, vagas e WFP. Os subsistemas de RH ficam interligados. Inclui um **assistente de IA** (Claude) com três modos — Analista, Materiais e Coach — que trabalha sobre toda a base de pessoas e sobre os arquivos que você enviar.
 
-> A base que acompanha o projeto é **sintética** (≈2.650 colaboradores em 8 diretorias fictícias). Nenhum dado real é incluído.
+> O projeto vem com um **ambiente simulado**: cerca de 2.660 colaboradores fictícios em 8 diretorias e 18 tribos, com hierarquia, clima, licenças, movimentações, ATS e contexto de negócio. Nenhum dado real é incluído.
 
-## Como abrir
+## Como rodar
 
-1. Baixe o repositório e dê duplo clique em `index.html` — funciona offline, sem instalar nada (Chart.js está embarcado em `assets/vendor`).
-2. Se o navegador bloquear arquivos locais, sirva a pasta: `python -m http.server 8090` e acesse `http://localhost:8090`.
+| Situação | O que fazer |
+|---|---|
+| **Completo** (IA, conectores, upload de Excel/PDF/imagens) | Windows: duplo clique em `iniciar.bat`. Linux/macOS: `./iniciar.sh`. Depois acesse **http://localhost:8765** |
+| Só olhar (offline, sem IA) | Duplo clique em `index.html` (usa `data/base_demo.js`) |
+
+Requisitos: Python 3.10+. Para a IA, defina `ANTHROPIC_API_KEY` (ou rode `ant auth login`) antes de iniciar. Sem chave, tudo funciona, exceto o assistente e a leitura de PDF/imagens.
+
+```bash
+python -m server                          # cockpit + API em http://localhost:8765
+python -m server --reset                  # recria o ambiente simulado
+python -m server --pergunta "Onde há risco de burnout?" --modo analista
+python -m server --rotina briefing        # rotinas: briefing | pautas | retencao | org-health
+python -m server --exportar-demo          # regenera data/base_demo.js (modo offline)
+```
+
+As rotinas podem ser agendadas no Agendador de Tarefas do Windows ou no cron. Exemplo: toda segunda às 7h40 → `python -m server --rotina briefing`. Os materiais gerados ficam em `server/saidas/`.
 
 ## Módulos
 
-| Módulo | O que entrega |
+**Cockpit**
+- **Visão geral:** KPIs com farol, Org Health Index, receita/FTE, alertas prioritários, agenda do BP e matriz por diretoria.
+- **Indicadores estratégicos:** Org Health Index, HC ROI, receita por FTE, custo de pessoas/receita, talent density, regretted attrition, internal fill rate, quality of hire, early attrition, taxa de promoção, Manager Effectiveness Index, spans & layers, burnout risk index, gap salarial ajustado por gênero, exposição à IA generativa, funil de diversidade por nível e scorecard pessoas × negócio por tribo (OKR, NPS de cliente).
+- **Insights inteligentes:** regras que cruzam subsistemas, cada uma com valor em risco, ação, playbook e **ferramentas sugeridas**.
+
+**Análises**
+- **People Analytics:** modelo de saída voluntária (regressão logística com validação em holdout), fatores por pessoa, 9-box × risco e simulador de retenção com ROI.
+- **Org design & tribos:** distribuição de spans, camadas, gestores com menor efetividade e organograma navegável.
+- **Clima & bem-estar:** mapa de calor tribo × dimensão (incluindo segurança psicológica e carga de trabalho), evolução entre ciclos, licenças e afastamentos (saúde apenas agregada).
+- **WFP, Orçamento, Vagas, Subsistemas de RH:** cenários de força de trabalho, orçado × realizado × forecast, funil e SLA de vagas, e visão 360° do colaborador.
+
+**IA & execução**
+- **✦ Assistente IA**
+  - **Analista:** novas análises cruzando qualquer tabela, as planilhas que você subir e os documentos lidos. Responde com gráficos.
+  - **Materiais:** apresentações, one-pages, memos, pautas, business cases e e-mails gerados a partir de um prompt. Imprime em PDF com gráficos.
+  - **Coach do BP:** apoia decisões, levanta hipóteses de causa-raiz, indica a ferramenta certa e monta o plano de aplicação e o posicionamento com o diretor.
+- **Caixa de ferramentas:** 24 ferramentas do BP estratégico, como skip level, stay interview, assimilação de novo líder, team canvas, segurança psicológica, Weisbord, Galbraith, spans & layers, ONA, JD-R/burnout, calibração 9-box, sucessão, build-buy-borrow-bot, reskilling para IA, ADKAR, RAPID, SBI, Thomas-Kilmann, pre-mortem, auditoria de equidade, business case e people strategy canvas.
+  - As ferramentas são **recomendadas automaticamente** pelos alertas.
+  - Viram tarefas com roteiro ou uma sessão com o coach.
+- **Automação & tarefas** e **Materiais executivos** (modelos prontos, sem IA).
+
+**Dados & integrações**
+- Conectores, envio de arquivos, catálogo de dados, documentos e LGPD.
+
+## Envio de arquivos (Excel, CSV, PDF, imagens)
+
+| Arquivo | O que acontece |
 |---|---|
-| **Visão geral** | KPIs com status, headcount e movimentação mensal, insights prioritários, agenda do BP e matriz de telemetria por área (clique para focar). |
-| **Telemetria** | Absenteísmo, horas extras, compa-ratio, folha, férias vencidas, diversidade; tendências trimestrais. |
-| **Insights inteligentes** | Motor de regras que cruza subsistemas (ex.: HE alta + absenteísmo em alta → sobrecarga; talento + compa < 0,90 → retenção), com exposição financeira, ação e playbook. Um clique cria a tarefa ou o e-mail. |
-| **People Analytics** | Regressão logística treinada no navegador para prever saída voluntária em 12 meses (AUC em holdout ≈ 0,75), fatores explicativos por pessoa, 9-box × risco, lista exportável e **simulador de retenção** (mérito, HE, férias, stay interview → saídas evitadas, custo e ROI). |
-| **WFP** | Oferta × demanda em 12 meses por área, com cenários (crescimento, automação/IA, retenção), pipeline de vagas e gaps de competências críticas (build × buy). |
-| **Orçamento** | Orçado × realizado × forecast mensal (dissídio de setembro e 13º incluídos), desvios por área, HE e verba de treinamento. |
-| **Vagas · R&S** | Funil, aging, SLA por nível, produtividade por recrutador, filtros (fora do SLA, não orçadas, aumento de quadro) e comitê de vagas. |
-| **Subsistemas de RH** | 12 subsistemas (R&S, Remuneração, Desempenho, T&D, Clima, Saúde, DP, Sucessão, D&I, WFP, Orçamento, People Analytics), mapa das interligações ativas e **visão 360° do colaborador**. |
-| **Automação & tarefas** | Kanban com checklists de playbooks, prazos, rascunhos de e-mail e listas exportáveis; rotinas (férias, regulatórios, risco de talentos, comitê de vagas, fechamento mensal). Tarefas ficam salvas no navegador. |
-| **Materiais executivos** | One-page, pauta da reunião com o diretor, relatório de turnover, business case de headcount e nota orçamentária — prontos para imprimir/PDF, copiar ou baixar em HTML. |
-| **Copiloto** | Botão flutuante. Sem agente: responde localmente (prioridades, risco, orçamento, vagas, WFP…) e gera materiais. Com agente: respostas redigidas pelo Claude usando os dados do cockpit. |
+| Excel/CSV com matrícula + campos de pessoas | Atualiza/inclui colaboradores (merge por matrícula) e re-treina o modelo de risco. Os cabeçalhos são reconhecidos por sinônimos (ex.: "Chapa", "Nota Desempenho", "Área") |
+| Excel/CSV de vagas | Atualiza as requisições |
+| Qualquer outra planilha (cada aba) | Vira uma tabela `x_...` que o assistente pode cruzar com a base (ex.: NPS de marca por tribo, budget de projetos, resultados de assessment) |
+| PDF / imagem (foto de quadro, organograma, relatório) | A IA lê e extrai resumo, indicadores e tabelas. Tudo fica disponível como contexto e como tabelas `x_doc...` |
 
-## Usando dados reais
+Arraste os arquivos para o chat do assistente ou para a tela Dados & integrações.
 
-Em **Dados & integrações**, importe CSVs (separador `;` ou `,`) nos layouts de `data/modelo_colaboradores.csv` (ativos + desligados dos últimos 12 meses) e `data/modelo_vagas.csv`. O processamento é 100% local no navegador. O modelo preditivo é re-treinado automaticamente com a sua base.
+## Integração com as bases oficiais
 
-Atenção: a importação substitui colaboradores e vagas; **orçamento e competências continuam sintéticos** até você ajustá-los. O orçamento, as competências críticas e as premissas de crescimento/automação por área estão em `assets/js/data.js` (`AREAS`, `SKILLS`) — ajuste-os para o seu plano. Limiares de alerta ficam em `CONFIG` (`assets/js/analytics.js`) e `LIMIAR` (`assets/js/views.js`).
+Os conectores ficam em `server/conectores.py` e hoje rodam em modo **simulado**. Cada um já declara as tabelas que alimenta e como será a integração real:
 
-## Agente Claude (opcional)
+| Conector | Fonte oficial | Tabelas |
+|---|---|---|
+| `sap` | SAP SuccessFactors (OData v2) ou SAP HCM (RFC / HANA), CO para orçamento | diretorias, colaboradores (com hierarquia), orcamento, competencias |
+| `movimentacoes` | Sistema de movimentações | movimentacoes |
+| `ats` | ATS de vagas (API) | vagas, candidatos |
+| `clima` | Plataforma da pesquisa de clima (API/CSV agregados) | clima |
+| `datalake` | Data lake de RH (ponto, afastamentos eSocial S-2230, LMS) | licencas, series |
+| `negocio` | BI/Finanças e ferramenta de OKRs | tribos |
 
-```bash
-pip install -r agent/requirements.txt
-export ANTHROPIC_API_KEY=...          # ou: ant auth login
+Para ligar uma fonte:
+1. Implemente `extrair_real()` na classe do conector, devolvendo linhas no esquema canônico (o mesmo do `server/simulador.py`).
+2. Configure as credenciais em variáveis de ambiente (nunca no código).
+3. Mude o `modo` para `"real"` em `server/conectores.json`.
 
-# 1. No cockpit: Dados & integrações → Exportar snapshot.json → salve em agent/snapshot.json
-#    (sem esse arquivo, o agente usa agent/snapshot_exemplo.json)
+O restante do cockpit, do modelo preditivo e do assistente não muda.
 
-python agent/bp_agent.py                          # chat no terminal
-python agent/bp_agent.py --pergunta "Quais talentos de Tecnologia estão em risco e por quê?"
-python agent/bp_agent.py --rotina briefing        # também: pauta, retencao
-python agent/bp_agent.py --serve                  # liga o Copiloto do cockpit ao Claude
+## Arquitetura
+
+```
+index.html, assets/          front-end (sem build). Identidade visual em assets/css/cockpit.css; logotipo em assets/brand/
+  js/data.js                 carrega a base do servidor ou a demo offline
+  js/analytics.js            KPIs, indicadores estratégicos, org design, WFP, orçamento, motor de insights
+  js/views.js, views2.js     telas
+  js/ferramentas.js          caixa de ferramentas (compartilhada com o coach)
+  js/app.js                  navegação, filtros diretoria/tribo, chat, uploads, tarefas
+server/                      Python
+  app.py                     servidor local (127.0.0.1) e API
+  simulador.py               ambiente simulado (fonte única dos dados de demonstração)
+  conectores.py              conectores (simulado → real)
+  banco.py                   SQLite local, views analíticas e SQL somente leitura para a IA
+  modelo.py                  modelo preditivo de saída voluntária
+  ingestao.py                Excel/CSV/PDF/imagens
+  agente.py                  assistente Claude: analista, materiais, coach
 ```
 
-- Modelo `claude-opus-5-5` com raciocínio adaptativo (`--effort` controla profundidade/custo) e fallback automático em caso de recusa.
-- O agente consulta os números por ferramentas (`indicadores`, `insights`, `colaboradores_em_risco`, `vagas`, `wfp_e_competencias`, `modelo_preditivo`, `tarefas`) e salva materiais em `agent/saidas/`.
-- Com `--serve`, a API escuta só em `127.0.0.1:8765`; o cockpit detecta o agente, envia o snapshot anonimizado e o Copiloto, os e-mails e os materiais ganham a opção "com IA".
-- **Rotinas agendadas:** agende `--rotina briefing` no cron (Linux/macOS) ou no Agendador de Tarefas (Windows), ex.: `0 8 * * 1 python /caminho/agent/bp_agent.py --rotina briefing`.
+O assistente usa o modelo `claude-opus-5-5`, com raciocínio adaptativo e fallback automático em caso de recusa. A profundidade é ajustável por `BP_EFFORT=low|medium|high`.
+
+Ele consulta a base **somente leitura** (uma consulta SELECT por vez, com limite de linhas e de tempo) e nunca altera dados.
+
+## Identidade visual
+
+- **Cores:** vermelho institucional e gradiente da marca.
+- **Fonte:** "Bradesco Sans", quando instalada.
+- **Logotipo:** coloque o arquivo oficial em `assets/brand/logo.svg`. Obtenha-o com a área de Marca e não o versione em repositórios públicos.
+- **Gráficos:** usam uma paleta validada para daltonismo. O vermelho fica reservado à marca e ao status crítico.
 
 ## Governança e LGPD
 
-- Raça, PcD e dados de saúde são dados pessoais sensíveis: confirme base legal e finalidade com o DPO antes de importar dados reais.
-- Scores de risco são probabilidades estatísticas — **nunca** use como critério isolado para desligamento, promoção ou remuneração.
-- Materiais e o snapshot para IA identificam pessoas apenas por matrícula. Valide com Segurança da Informação antes de enviar dados reais a serviços externos.
-
-## Estrutura
-
-```
-index.html                 cockpit (abre direto no navegador)
-assets/js/data.js          base sintética determinística + importação CSV
-assets/js/analytics.js     KPIs, modelo preditivo, WFP, orçamento, insights, playbooks
-assets/js/materiais.js     materiais executivos e comunicações
-assets/js/views.js         telas
-assets/js/app.js           estado, navegação, gráficos, tarefas, copiloto, integração com o agente
-assets/css/cockpit.css     tema claro/escuro, responsivo, estilos de impressão
-agent/bp_agent.py          agente Claude (CLI, rotinas e API local)
-data/                      modelos de CSV para importação
-```
+- O servidor só aceita conexões do próprio computador. A base fica em `server/dados/bp.db`, fora do controle de versão.
+- À API do Claude vão apenas as perguntas, os resultados das consultas que o assistente faz e os arquivos que você enviar para leitura. **Valide com o DPO e com Segurança da Informação antes de usar dados reais.**
+- Dados de saúde aparecem apenas agregados. Grupos pequenos não devem ser expostos.
+- Scores de risco e índices são estatísticos e **nunca** devem ser critério isolado para desligar, promover ou remunerar.
+- A IA pode errar: confira os números antes de levar qualquer material à diretoria.

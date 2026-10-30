@@ -13,9 +13,9 @@
   };
 
   const NAV = [
-    ['Cockpit', [['visao', 'Visão geral'], ['telemetria', 'Telemetria'], ['insights', 'Insights inteligentes']]],
-    ['Análises', [['preditivo', 'People Analytics'], ['wfp', 'WFP · Força de trabalho'], ['orcamento', 'Orçamento'], ['vagas', 'Vagas · R&S'], ['subsistemas', 'Subsistemas de RH']]],
-    ['Execução', [['automacao', 'Automação & tarefas'], ['materiais', 'Materiais executivos']]],
+    ['Cockpit', [['visao', 'Visão geral'], ['estrategicos', 'Indicadores estratégicos'], ['telemetria', 'Telemetria'], ['insights', 'Insights inteligentes']]],
+    ['Análises', [['preditivo', 'People Analytics'], ['org', 'Org design & tribos'], ['clima', 'Clima & bem-estar'], ['wfp', 'WFP · Força de trabalho'], ['orcamento', 'Orçamento'], ['vagas', 'Vagas · R&S'], ['subsistemas', 'Subsistemas de RH']]],
+    ['IA & execução', [['assistente', '✦ Assistente IA'], ['ferramentas', 'Caixa de ferramentas'], ['automacao', 'Automação & tarefas'], ['materiais', 'Materiais executivos']]],
     ['Configuração', [['dados', 'Dados & integrações']]]
   ];
   const TITULOS = Object.fromEntries(NAV.flatMap(([, it]) => it));
@@ -24,14 +24,30 @@
   const S = {
     base: null, modelo: null, area: LS.get('bp-area', 'todas'), view: 'visao',
     tarefas: LS.get('bp-tarefas', []), anon: LS.get('bp-anon', false),
-    agente: false, agenteUrl: LS.get('bp-agente-url', 'http://localhost:8765'), sessao: 'cockpit-' + Math.random().toString(36).slice(2, 8),
+    tribo: 'todas', agente: false, chat: { analista: [], materiais: [], coach: [] }, anexos: [], catalogo: null,
+    sessoes: { analista: 'web-' + Math.random().toString(36).slice(2, 9), materiais: 'web-' + Math.random().toString(36).slice(2, 9), coach: 'web-' + Math.random().toString(36).slice(2, 9), copiloto: 'cop-' + Math.random().toString(36).slice(2, 9) },
     ui: { sim: { merito: 0.08, reducaoHE: 0.3, ferias: true, stay: true, soTalentos: false }, cenario: { crescimento: 0, automacao: 0, retencao: 0 } }
   };
   const charts = {};
 
-  function carregarBase() {
-    S.base = D.gerarBase();
+  async function carregarBase() {
+    S.base = await D.carregar();
     S.modelo = A.preparar(S.base);
+    S.agente = S.base.servidor;
+    if (!S.base.areas.some((a) => a.id === S.area)) S.area = 'todas';
+  }
+  async function api(caminho, corpo) {
+    const r = await fetch('api/' + caminho, corpo === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const j = await r.json().catch(() => ({ erro: 'Resposta inválida do servidor' }));
+    if (!r.ok) throw new Error(j.erro || 'Erro ' + r.status);
+    return j;
+  }
+  async function recarregarDoServidor(msg) {
+    await carregarBase();
+    S.catalogo = await api('catalogo').catch(() => S.catalogo);
+    enviarSnapshotServidor();
+    if (msg) toast(msg);
+    render();
   }
 
   // ------------------------------------------------------------- Gráficos
@@ -105,7 +121,8 @@
     S.tarefas.unshift({
       id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), origem: ins.id, titulo: ins.titulo, acao: ins.acao,
       area: ins.area || S.area, areaNome: ins.areaNome, playbook: ins.playbook, alvo: ins.alvo || [], status: 'afazer',
-      prazo: prazo.toISOString(), passos: pb.passos.map((t) => ({ t, ok: false })), criadaEm: new Date().toISOString()
+      prazo: prazo.toISOString(), passos: (ins.passos || pb.passos).map((t) => ({ t, ok: false })), criadaEm: new Date().toISOString(),
+      playbookNome: A.PLAYBOOKS[ins.playbook] ? pb.nome : ((window.BP_FERRAMENTAS || []).find((f) => f.id === ins.playbook) || {}).nome
     });
     salvarTarefas();
     if (!silencioso) { toast('Tarefa criada em Automação & tarefas'); renderNav(); }
@@ -159,7 +176,7 @@
     };
     r.readAsText(arquivo, 'utf-8');
   }
-  function resetBase() { carregarBase(); toast('Base sintética restaurada'); render(); }
+  async function resetBase() { delete window.BP_BASE_DEMO; await carregarBase(); toast('Base restaurada'); render(); }
 
   function snapshot(anon) {
     const b = S.base, m = S.modelo;
@@ -207,31 +224,102 @@
   }
   function exportarSnapshot(anon) { baixar('snapshot.json', JSON.stringify(snapshot(anon), null, 1), 'application/json'); toast('snapshot.json exportado'); }
 
-  // -------------------------------------------------------------- Agente
-  async function testarAgente(avisar) {
-    LS.set('bp-agente-url', S.agenteUrl);
-    try {
-      const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 1500);
-      const r = await fetch(S.agenteUrl + '/health', { signal: ctrl.signal });
-      S.agente = r.ok;
-    } catch (e) { S.agente = false; }
-    $('#copilotMode').textContent = S.agente ? 'Agente Claude conectado' : 'Modo local (sem IA generativa)';
-    if (avisar) { toast(S.agente ? 'Agente conectado' : 'Agente não encontrado em ' + S.agenteUrl); render(); }
+  // ------------------------------------------------- Servidor / IA
+  function enviarSnapshotServidor() {
+    if (!S.base.servidor) return;
+    const kpis = { todas: A.kpis(S.base, 'todas') };
+    S.base.areas.forEach((a) => { if (S.base.colaboradores.some((c) => c.area === a.id)) kpis[a.id] = A.kpis(S.base, a.id); });
+    const enxuto = (k) => { const { serie, orc, ...r } = k; return Object.assign(r, { orcamento_var_forecast: orc.varForecast, orcamento_forecast: orc.forecastAno, he_ytd: orc.heYtd }); };
+    api('snapshot', {
+      gerado_em: new Date().toISOString(),
+      insights: A.insights(S.base, 'todas').map((i) => ({ id: i.id, severidade: i.sev, area_id: i.area, area: i.areaNome, titulo: i.titulo, detalhe: i.detalhe, acao: i.acao, exposicao_brl: Math.round(i.impacto), subsistemas: i.subsistemas, ferramentas: i.ferramentas })),
+      kpis: Object.fromEntries(Object.entries(kpis).map(([k, v]) => [k, enxuto(v)]))
+    }).catch(() => { /* agente segue com SQL */ });
   }
-  async function enviarSnapshotAgente() {
-    try { await fetch(S.agenteUrl + '/snapshot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snapshot(true)) }); } catch (e) { /* agente usa o arquivo local */ }
+  function contextoAtual() {
+    const area = S.area === 'todas' ? 'todas as diretorias' : S.base.areas.find((a) => a.id === S.area).nome;
+    return `diretoria em foco: ${area} (id ${S.area}); tribo: ${S.tribo}` + (S.anexos.length ? `; arquivos enviados nesta conversa: ${S.anexos.map((a) => a.descricao).join(' | ')}` : '');
   }
-  async function perguntarAgente(texto) {
-    abrirCopiloto();
-    addMsg('user', texto);
-    const espera = addMsg('bot', 'Consultando o agente…');
-    try {
-      const r = await fetch(S.agenteUrl + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessao: S.sessao, mensagem: texto, area_em_foco: S.area }) });
-      const j = await r.json();
-      espera.textContent = j.resposta || j.erro || 'Sem resposta.';
-    } catch (e) {
-      espera.textContent = 'Não consegui falar com o agente. Respondendo em modo local:\n\n' + responderLocal(texto);
+  async function chatEnviar(modo, texto) {
+    const lista = S.chat[modo];
+    lista.push({ quem: 'user', texto });
+    if (!S.base.servidor) {
+      lista.push({ quem: 'bot', texto: modo === 'analista' ? responderLocal(texto) : 'Este modo precisa do servidor local com a IA configurada. Rode `python -m server` e acesse http://localhost:8765.' });
+      if (S.view === 'assistente') render();
+      return;
     }
+    const msg = { quem: 'bot', pendente: true, texto: '' };
+    lista.push(msg);
+    if (S.view === 'assistente') render();
+    try {
+      const r = await api('chat', { sessao: S.sessoes[modo], modo, mensagem: texto, contexto: contextoAtual() });
+      Object.assign(msg, { pendente: false, texto: r.resposta, graficos: r.graficos, materiais: r.materiais });
+    } catch (e) {
+      Object.assign(msg, { pendente: false, texto: '⚠️ ' + e.message + (modo === 'analista' ? '\n\nResposta em modo local:\n\n' + responderLocal(texto) : '') });
+    }
+    if (S.view === 'assistente') render(); else toast('Assistente respondeu — abra "Assistente IA"');
+  }
+  function lerBase64(arquivo) {
+    return new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = erro; r.readAsDataURL(arquivo); });
+  }
+  async function enviarArquivos(arquivos, alvo) {
+    if (!arquivos.length) return;
+    if (!S.base.servidor) {
+      const csv = arquivos.find((a) => /\.csv$/i.test(a.name));
+      if (csv) return importar(csv, /vaga/i.test(csv.name) ? 'vagas' : 'colaboradores');
+      return toast('Sem servidor: só CSV pode ser importado. Rode python -m server para Excel, PDF e imagens.');
+    }
+    for (const arq of arquivos) {
+      const aviso = (t) => { if (alvo) alvo.innerHTML += `<div>${M.esc(t)}</div>`; else S.chat[S.ui.modoIA || 'analista'].push({ quem: 'sys', texto: t }); if (!alvo && S.view === 'assistente') render(); };
+      aviso(`Enviando ${arq.name}…`);
+      try {
+        const r = await api('upload', { nome: arq.name, mime: arq.type, base64: await lerBase64(arq) });
+        let desc;
+        if (r.tipo === 'planilha') desc = `${arq.name} → ` + r.resultados.map((x) => x.destino === 'colaboradores' ? `colaboradores (${x.novos} novos, ${x.atualizados} atualizados)` : x.destino === 'vagas' ? `vagas (${x.linhas})` : `tabela ${x.destino} (${x.linhas} linhas)`).join('; ');
+        else desc = r.processado ? `${arq.name} → documento #${r.documento_id} (${r.tipo_documento}): ${r.resumo}` + (r.tabelas_geradas.length ? ` Tabelas: ${r.tabelas_geradas.join(', ')}` : '') : `${arq.name} armazenado sem leitura por IA (${r.erro})`;
+        S.anexos.push({ nome: arq.name, descricao: desc });
+        aviso('✓ ' + desc);
+      } catch (e) { aviso(`✗ ${arq.name}: ${e.message}`); }
+    }
+    await recarregarDoServidor();
+  }
+  async function sincronizar(id, botao) {
+    if (botao) { botao.disabled = true; botao.textContent = 'Sincronizando…'; }
+    try { await api(`conectores/${id}/sincronizar`, {}); await recarregarDoServidor('Sincronização concluída'); } catch (e) { toast(e.message); render(); }
+  }
+  function perguntarAgente(texto) { S.ui.modoIA = 'analista'; go('assistente'); chatEnviar('analista', texto); }
+  function testarAgente() { toast(S.base.servidor ? 'Servidor conectado' : 'Rode python -m server e acesse http://localhost:8765'); }
+  function abrirFerramenta(id, ins) {
+    const t = (window.BP_FERRAMENTAS || []).find((x) => x.id === id);
+    if (!t) return;
+    modal(t.nome, V.htmlFerramenta(t, ins), [
+      ['Criar tarefa com o roteiro', (dlg) => {
+        criarTarefa({ id: 'ferr-' + id + '-' + (ins ? ins.id : S.area), area: ins ? ins.area : S.area, areaNome: ins ? ins.areaNome : (S.area === 'todas' ? 'Todas as áreas' : S.base.areas.find((a) => a.id === S.area).nome), playbook: id, alvo: ins ? ins.alvo || [] : [], titulo: `${t.nome}${ins ? ' — ' + ins.titulo : ''}`, acao: t.objetivo, passos: t.passos });
+        dlg.close();
+      }],
+      ['✦ Aplicar com o coach', (dlg) => { dlg.close(); aplicarComCoach(id, ins); }, true]
+    ]);
+  }
+  function aplicarComCoach(id, ins) {
+    const t = (window.BP_FERRAMENTAS || []).find((x) => x.id === id);
+    S.ui.modoIA = 'coach'; go('assistente');
+    chatEnviar('coach', `Quero aplicar "${t.nome}"${ins ? ` em ${ins.areaNome}, por causa do alerta: ${ins.titulo} (${ins.detalhe})` : ''}. Me ajude a decidir se é a ferramenta certa, quem envolver, o roteiro adaptado ao nosso contexto e como apresentar ao diretor.`);
+  }
+  function abrirMaterialIA(mat, graficos) {
+    const corpo = `<article class="doc md" id="matDoc"><div class="subt">Bradesco · Gente & Gestão · HR Business Partner · ${D.HOJE.toLocaleDateString('pt-BR')} · Uso interno — confidencial</div>${V._md.md(mat.markdown, graficos, 'mg')}</article>`;
+    modal(mat.titulo, corpo, [
+      ['Copiar Markdown', () => navigator.clipboard.writeText(mat.markdown).then(() => toast('Copiado'))],
+      ['⎙ Imprimir / PDF', () => imprimirDoc(mat.titulo), true]
+    ]);
+    V._md.renderGraficos($('#modalBody'), graficos, 'mg', ui);
+  }
+  function imprimirDoc(titulo) {
+    const doc = $('#matDoc').cloneNode(true);
+    doc.querySelectorAll('canvas').forEach((cv) => { const orig = document.getElementById(cv.id); const img = document.createElement('img'); img.src = orig.toDataURL('image/png'); img.style.maxWidth = '100%'; cv.parentElement.replaceWith(img); });
+    const w = window.open('', '_blank');
+    if (!w) return toast('Permita pop-ups para imprimir');
+    w.document.write(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>${M.esc(titulo)}</title><style>body{font-family:"Bradesco Sans",system-ui,sans-serif;margin:32px;color:#111}h1,h2,h3{color:#8f0621}h2{border-bottom:2px solid #cc092f;padding-bottom:4px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border-bottom:1px solid #e5e5e5;padding:6px 8px;text-align:left}th{background:#fbe9ec}.subt{color:#666;font-size:12px}img{margin:8px 0}</style>${doc.outerHTML}<script>setTimeout(()=>print(),300)<\/script></html>`);
+    w.document.close();
   }
 
   // ------------------------------------------------- Copiloto (modo local)
@@ -276,7 +364,7 @@
     if (has('resumo', 'status', 'como esta', 'visao', 'panorama', 'geral')) {
       return `${nome}: ${k.hc} pessoas · turnover ${p100(k.turnover, 1)} · previsto ${p100(k.turnoverPrevisto, 1)} · eNPS ${k.enps} · ${k.vagas} vagas (${k.vagasForaSla} fora SLA) · forecast ${p100(k.orc.varForecast, 1)} vs orçado · regulatórios ${p100(k.treinamento, 1)}.`;
     }
-    return 'Posso responder sobre: risco de saída, orçamento, vagas, WFP, férias, treinamentos, clima, diversidade, sucessão, prioridades — ou gerar pauta/one-page/business case. Mencione a área (ex.: "risco em Tecnologia").\n\nPara respostas redigidas por IA, conecte o agente Claude (Dados & integrações).';
+    return 'Posso responder sobre: risco de saída, orçamento, vagas, WFP, férias, treinamentos, clima, diversidade, sucessão, prioridades — ou gerar pauta/one-page/business case. Mencione a área (ex.: "risco em Tecnologia").\n\nPara análises livres, materiais por prompt e o coach, ligue o servidor com IA (python -m server).';
   }
 
   function addMsg(quem, txt) {
@@ -290,7 +378,12 @@
     e.preventDefault();
     const t = $('#copilotInput').value.trim(); if (!t) return;
     $('#copilotInput').value = '';
-    if (S.agente) perguntarAgente(t); else { addMsg('user', t); addMsg('bot', responderLocal(t)); }
+    addMsg('user', t);
+    if (!S.base.servidor) { addMsg('bot', responderLocal(t)); return; }
+    const espera = addMsg('bot', 'Consultando a base…');
+    api('chat', { sessao: S.sessoes.copiloto, modo: 'analista', mensagem: t, contexto: contextoAtual() })
+      .then((r) => { espera.innerHTML = V._md.md(r.resposta, r.graficos, 'cp' + Date.now()) + (r.graficos && r.graficos.length ? '<p class="small muted">Gráficos completos no Assistente IA.</p>' : ''); })
+      .catch((e) => { espera.textContent = '⚠️ ' + e.message + '\n\n' + responderLocal(t); });
   });
   ['Quais minhas prioridades?', 'Risco de saída em Tecnologia', 'Como está o orçamento?', 'Gerar pauta com o diretor'].forEach((s) => {
     const b = document.createElement('button'); b.className = 'chip'; b.textContent = s;
@@ -308,15 +401,27 @@
     $('#nav').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
   }
   function renderAreaSel() {
-    $('#areaSel').innerHTML = '<option value="todas">Todas as áreas atendidas</option>' + S.base.areas.filter((a) => S.base.colaboradores.some((c) => c.area === a.id))
+    $('#areaSel').innerHTML = '<option value="todas">Todas as diretorias</option>' + S.base.areas.filter((a) => S.base.colaboradores.some((c) => c.area === a.id))
       .map((a) => `<option value="${a.id}" ${S.area === a.id ? 'selected' : ''}>${a.nome}</option>`).join('');
     $('#areaSel').value = S.area;
+  }
+  function renderTriboSel() {
+    const tribos = (S.base.tribos || []).filter((t) => S.area === 'todas' || t.area === S.area);
+    if (S.tribo !== 'todas' && !tribos.some((t) => t.id === S.tribo)) S.tribo = 'todas';
+    $('#triboSel').innerHTML = '<option value="todas">Todas as tribos</option>' + tribos.map((t) => `<option value="${t.id}">${M.esc(t.nome)}</option>`).join('');
+    $('#triboSel').value = S.tribo;
+    $('#triboSel').hidden = !tribos.length;
+    A.setTribo(S.tribo);
   }
   function render() {
     Object.keys(charts).forEach((id) => { charts[id].destroy(); delete charts[id]; });
     if (!S.base.areas.some((a) => a.id === S.area)) S.area = 'todas';
-    renderAreaSel(); renderNav();
+    renderAreaSel(); renderTriboSel(); renderNav();
+    $('#fontePill').textContent = S.base.servidor ? (S.base.sintetico ? '● Servidor · ambiente simulado' : '● Servidor · dados conectados') : '○ Offline · base de demonstração';
+    if (S.view === 'dados' && S.base.servidor && !S.catalogo) { api('catalogo').then((c) => { S.catalogo = c; render(); }).catch((e) => toast(e.message)); }
     $('#viewTitle').textContent = TITULOS[S.view];
+    $('#copilotFab').hidden = S.view === 'assistente';
+    if (S.view === 'assistente') $('#copilot').classList.remove('open');
     $('#dataBadge').textContent = `${S.base.sintetico ? 'Base sintética de demonstração' : 'Base importada'} · referência ${D.HOJE.toLocaleDateString('pt-BR')} · ${S.base.colaboradores.length.toLocaleString('pt-BR')} colaboradores`;
     const v = V[S.view](S, ui);
     const root = $('#view');
@@ -330,9 +435,11 @@
     $('#sidebar').classList.remove('open');
     render(); window.scrollTo(0, 0);
   }
-  function setArea(id, silencioso) { S.area = id; LS.set('bp-area', id); S.ui.ninebox = null; if (!silencioso) render(); }
+  function setArea(id, silencioso) { S.area = id; S.tribo = 'todas'; LS.set('bp-area', id); S.ui.ninebox = null; if (!silencioso) render(); }
+  function setTribo(id) { S.tribo = id; render(); }
 
   $('#areaSel').addEventListener('change', (e) => setArea(e.target.value));
+  $('#triboSel').addEventListener('change', (e) => setTribo(e.target.value));
   $('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
   $('#themeBtn').addEventListener('click', () => {
     const atual = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -343,14 +450,17 @@
 
   const ui = {
     chart, ds, opts, render, go, setArea, toast, baixar, baixarCSV, modal, criarTarefa, abrirComunicacao, salvarTarefas, executarRotina, visao360,
-    importar, resetBase, exportarSnapshot, testarAgente, perguntarAgente
+    importar, resetBase, exportarSnapshot, testarAgente, perguntarAgente, setTribo, chatEnviar, enviarArquivos, sincronizar, abrirFerramenta,
+    aplicarComCoach, abrirMaterialIA, responderLocal, api
   };
 
   // ------------------------------------------------------------- Início
   const tema = LS.get('bp-tema', null); if (tema) document.documentElement.dataset.theme = tema;
-  carregarBase();
   S.view = TITULOS[location.hash.slice(1)] ? location.hash.slice(1) : 'visao';
-  render();
-  testarAgente(false).then(() => { if (S.agente) { enviarSnapshotAgente(); render(); } });
+  carregarBase().then(() => {
+    render();
+    enviarSnapshotServidor();
+    $('#copilotMode').textContent = S.base.servidor ? 'Conectado à base · IA no servidor' : 'Modo local (offline)';
+  }).catch((e) => { $('#view').innerHTML = `<div class="empty">Não foi possível carregar a base: ${M.esc(e.message)}</div>`; });
   window.BPCockpit = { S, ui, snapshot };
 })();

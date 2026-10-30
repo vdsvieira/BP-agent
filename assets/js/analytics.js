@@ -113,8 +113,9 @@
   // ---------------------------------------------------------------------
   // Preparação: pontua todos os ativos uma única vez
   // ---------------------------------------------------------------------
+  // Usa o modelo treinado pelo servidor (Python) quando disponível; senão treina aqui (modo offline/CSV).
   function preparar(base) {
-    const modelo = treinarModelo(base);
+    const modelo = base.modelo && base.modelo.w ? Object.assign({}, base.modelo, { areaById: Object.fromEntries(base.areas.map((a) => [a.id, a])) }) : treinarModelo(base);
     base.colaboradores.forEach((c) => {
       const r = pontuar(modelo, c);
       c.risco = r.prob; c.riscoDrivers = r.drivers; c.faixaRisco = faixaRisco(r.prob);
@@ -123,12 +124,16 @@
     return modelo;
   }
 
+  let TRIBO = null; // filtro opcional de tribo (aplicado a pessoas, vagas, clima e licenças)
+  function setTribo(t) { TRIBO = t && t !== 'todas' ? t : null; }
   function filtrar(base, areaId) {
     const ok = (x) => !areaId || areaId === 'todas' || x.area === areaId;
+    const okT = (x) => ok(x) && (!TRIBO || x.tribo === TRIBO);
     const areas = base.areas.filter((a) => ok({ area: a.id }));
     return {
-      areas, ativos: base.colaboradores.filter(ok), desligados: base.desligados.filter(ok), vagas: base.vagas.filter(ok),
-      competencias: base.competencias.filter(ok)
+      areas, ativos: base.colaboradores.filter(okT), desligados: base.desligados.filter(okT), vagas: base.vagas.filter((v) => ok(v) && (!TRIBO || !v.tribo || v.tribo === TRIBO)),
+      competencias: base.competencias.filter(ok), tribos: (base.tribos || []).filter((t) => ok(t) && (!TRIBO || t.id === TRIBO)),
+      clima: (base.clima || []).filter(okT), licencas: (base.licencas || []).filter(okT), movimentacoes: (base.movimentacoes || []).filter(ok)
     };
   }
 
@@ -281,7 +286,11 @@
     for (const a of areas) {
       const k = kpis(base, a.id);
       const f = filtrar(base, a.id);
-      const add = (o) => out.push(Object.assign({ area: a.id, areaNome: a.nome }, o));
+      const add = (o) => {
+        const sinal = o.id.slice(0, o.id.length - a.id.length - 1);
+        const ferramentas = (global.BP_FERRAMENTAS || []).filter((t) => t.sinais.includes(sinal)).slice(0, 3).map((t) => t.id);
+        out.push(Object.assign({ area: a.id, areaNome: a.nome, sinal, ferramentas }, o));
+      };
 
       const talentos = f.ativos.filter((c) => c.talento && c.faixaRisco === 'Alto');
       if (talentos.length) add({
@@ -374,6 +383,47 @@
         impacto: sum(gestorClima, (c) => c.risco * custoReposicao(c)) * 0.3, subsistemas: ['Clima', 'Liderança', 'People Analytics'],
         acao: 'Rodar assimilação de liderança (new leader assimilation) nas equipes afetadas.', playbook: 'stay-interview', alvo: gestorClima.map((c) => c.matricula)
       });
+
+      // ---- regras estratégicas (org design, clima, saúde, equidade, IA, negócio) ----
+      const e = estrategicos(base, a.id);
+      if (e.spans.gestores >= 5 && e.spans.pctEstreito > 0.25) add({
+        sev: 'atencao', id: 'spans-' + a.id, titulo: `${p100(e.spans.pctEstreito)} dos gestores com span < 4 (média ${dec(e.spans.medio, 1)})`,
+        detalhe: `${e.spans.gestores} gestores, até ${e.spans.camadas} camadas. Spans estreitos elevam custo de gestão e lentidão de decisão.`,
+        impacto: e.spans.custoEstreitos * 0.25, subsistemas: ['Org Design', 'Orçamento', 'Liderança'], acao: 'Revisar spans & layers e arquétipos de gestor antes do próximo ciclo orçamentário.', playbook: 'orcamento'
+      });
+      const psi = f.clima.filter((c) => c.dimensao === 'Segurança psicológica' && c.ciclo === e.clima.cicloAtual && c.fav < 65);
+      if (psi.length) add({
+        sev: 'atencao', id: 'clima-psi-' + a.id, titulo: `Segurança psicológica abaixo de 65% em ${psi.length} tribo(s)`,
+        detalhe: psi.map((c) => `${nomeTribo(base, c.tribo)}: ${dec(c.fav, 0)}%`).join(' · ') + '. Times com baixa segurança escondem erros e riscos — crítico em banco.',
+        impacto: 0, subsistemas: ['Clima', 'Liderança', 'Riscos'], acao: 'Workshop de segurança psicológica com os gestores das tribos e pulse em 90 dias.', playbook: 'stay-interview'
+      });
+      if (e.saude.b31 >= 3 && e.saude.pctMental > 0.4) add({
+        sev: 'critico', id: 'saude-mental-' + a.id, titulo: `${p100(e.saude.pctMental)} dos afastamentos INSS são por saúde mental`,
+        detalhe: `${e.saude.b31} afastamentos B31 no período (${int0(e.saude.diasPerdidos)} dias perdidos). Cruzar com HE (${dec(k.heMedia, 1)}h/mês) e dimensão Carga de trabalho.`,
+        impacto: e.saude.diasPerdidos * avg(f.ativos, (c) => c.salario) / 22, subsistemas: ['Saúde Ocupacional', 'DP', 'Clima'],
+        acao: 'Diagnóstico de carga (JD-R) nas equipes com mais casos e reforço do programa de apoio emocional.', playbook: 'burnout'
+      });
+      if (Math.abs(e.equidade.gapAjustado) > 0.03) add({
+        sev: 'atencao', id: 'equidade-' + a.id, titulo: `Gap salarial ajustado por gênero de ${p100(e.equidade.gapAjustado, 1)}`,
+        detalhe: 'Compa-ratio médio feminino vs masculino no mesmo nível. Relevante para o relatório de transparência salarial (Lei 14.611/2023).',
+        impacto: e.equidade.custoCorrecao, subsistemas: ['Remuneração', 'D&I', 'Jurídico'], acao: 'Auditoria de equidade e correção priorizada no ciclo de mérito.', playbook: 'merito'
+      });
+      if (e.ia.pctAlta > 0.3) add({
+        sev: 'oportunidade', id: 'ia-' + a.id, titulo: `${p100(e.ia.pctAlta)} do quadro em cargos de alta exposição à IA generativa`,
+        detalhe: `${e.ia.alta} pessoas. Oportunidade de produtividade e risco de obsolescência sem reskilling.`,
+        impacto: 0, subsistemas: ['WFP', 'T&D', 'Org Design'], acao: 'Plano de reskilling para IA e redesenho de cargos com Tecnologia.', playbook: 'upskilling'
+      });
+      const tribosRuins = f.tribos.filter((t) => t.okr < 0.6 && e.porTribo[t.id] && e.porTribo[t.id].enps < 5);
+      if (tribosRuins.length) add({
+        sev: 'critico', id: 'negocio-' + a.id, titulo: `Pessoas × negócio: ${tribosRuins.map((t) => t.nome).join(', ')} com OKR < 60% e eNPS baixo`,
+        detalhe: tribosRuins.map((t) => `${t.nome}: OKR ${p100(t.okr)}, eNPS ${e.porTribo[t.id].enps}, NPS cliente ${t.npsCliente}`).join(' · '),
+        impacto: 0, subsistemas: ['Negócio', 'Clima', 'Liderança', 'Org Design'], acao: 'Diagnóstico organizacional (Weisbord) com o líder da tribo e o diretor.', playbook: 'stay-interview'
+      });
+      if (e.mobilidade.internalFill < 0.2 && e.mobilidade.admissoes > 10) add({
+        sev: 'oportunidade', id: 'mobilidade-' + a.id, titulo: `Internal fill rate de ${p100(e.mobilidade.internalFill)}`,
+        detalhe: `${e.mobilidade.transferencias} movimentações internas × ${e.mobilidade.admissoes} admissões externas. Mobilidade interna retém talentos e reduz time-to-productivity.`,
+        impacto: 0, subsistemas: ['R&S', 'Carreira', 'WFP'], acao: 'Abrir vagas primeiro no marketplace interno e metas de mobilidade por diretoria.', playbook: 'upskilling'
+      });
     }
     const ordem = { critico: 0, atencao: 1, oportunidade: 2 };
     return out.sort((x, y) => ordem[x.sev] - ordem[y.sev] || y.impacto - x.impacto);
@@ -395,9 +445,119 @@
     'upskilling': { nome: 'Build × Buy de competências', prazo: 60, passos: ['Validar demanda com a área', 'Mapear potenciais internos', 'Desenhar trilha com Universidade Corporativa', 'Abrir vagas para o gap residual'] }
   };
 
+  // ---------------------------------------------------------------------
+  // Indicadores estratégicos (HRBP moderno)
+  // ---------------------------------------------------------------------
+  const int0 = (n) => Math.round(n).toLocaleString('pt-BR');
+  const nomeTribo = (base, id) => ((base.tribos || []).find((t) => t.id === id) || { nome: id || '—' }).nome;
+
+  function orgDesign(base, areaId) {
+    const f = filtrar(base, areaId);
+    const porGestor = {};
+    f.ativos.forEach((c) => { if (c.gestor) (porGestor[c.gestor] = porGestor[c.gestor] || []).push(c); });
+    const byMat = Object.fromEntries(base.colaboradores.concat(base.desligados.map((c) => Object.assign({}, c, { nivel: 'Gestor desligado — time sem líder' }))).map((c) => [c.matricula, c]));
+    const gestores = Object.entries(porGestor).map(([mat, time]) => {
+      const g = byMat[mat] || { matricula: mat, nivel: '—', cargo: '—', area: time[0].area };
+      const enpsT = Math.round((time.filter((c) => c.enps >= 9).length - time.filter((c) => c.enps <= 6).length) / time.length * 100);
+      const saidas = base.desligados.filter((c) => c.gestor === mat);
+      const turnT = saidas.length / (time.length + saidas.length / 2);
+      const risco = avg(time, (c) => c.risco || 0);
+      const perf = avg(time, (c) => c.desempenho);
+      // Manager Effectiveness Index (0–100): clima do time, retenção, risco e performance
+      const mei = Math.max(0, Math.min(100, 0.35 * (enpsT + 100) / 2 + 0.25 * (1 - Math.min(1, turnT * 3)) * 100 + 0.2 * (1 - Math.min(1, risco * 3)) * 100 + 0.2 * (perf - 1) / 4 * 100));
+      return { matricula: mat, nome: g.nome, nivel: g.nivel, cargo: g.cargo, area: g.area, tribo: g.tribo, camada: g.camada, span: time.length, enps: enpsT, turnover: turnT, risco, perf, mei, saidas: saidas.length };
+    });
+    const spans = gestores.map((g) => g.span);
+    const camadas = f.ativos.reduce((m, c) => Math.max(m, c.camada || 0), 0);
+    const estreitos = gestores.filter((g) => g.span < 4);
+    return {
+      gestores, medio: avg(spans), gestoresN: gestores.length, pctEstreito: gestores.length ? estreitos.length / gestores.length : 0,
+      pctLargo: gestores.length ? gestores.filter((g) => g.span > 12).length / gestores.length : 0, camadas,
+      custoEstreitos: sum(estreitos, (g) => (byMat[g.matricula] || { salario: 0 }).salario * 13.33 * FATOR_ENCARGOS),
+      histograma: [['1–3', 1, 3], ['4–6', 4, 6], ['7–9', 7, 9], ['10–12', 10, 12], ['13+', 13, 999]].map(([l, a, b]) => ({ l, n: spans.filter((s) => s >= a && s <= b).length })),
+      porCamada: Array.from({ length: camadas }, (_, i) => ({ camada: i + 1, n: f.ativos.filter((c) => c.camada === i + 1).length }))
+    };
+  }
+
+  function estrategicos(base, areaId) {
+    const f = filtrar(base, areaId);
+    const { ativos, desligados } = f;
+    const hc = ativos.length || 1;
+    const hcMedio = hc + desligados.length / 2;
+    const folhaAnual = sum(ativos, (c) => c.salario) * 13.33 * FATOR_ENCARGOS;
+    const tribosRec = f.tribos.filter((t) => t.receita);
+    const hcTribosRec = ativos.filter((c) => tribosRec.some((t) => t.id === c.tribo));
+    const receita = sum(tribosRec, (t) => t.receita) * 1e6;
+    const custoOp = sum(tribosRec, (t) => t.custo) * 1e6;
+    const folhaRec = sum(hcTribosRec, (c) => c.salario) * 13.33 * FATOR_ENCARGOS;
+    const contratados = ativos.filter((c) => c.tempoCasaMeses < 12).concat(desligados.filter((c) => c.tempoCasaMeses < 12));
+    const movs = f.movimentacoes;
+    const transf = movs.filter((m) => m.tipo === 'Transferência').length, adm = movs.filter((m) => m.tipo === 'Admissão').length;
+    // equidade: diferença de compa-ratio F vs M ponderada por nível
+    const niveis = [...new Set(ativos.map((c) => c.nivel))];
+    let somaGap = 0, pesoGap = 0, custoCorrecao = 0;
+    niveis.forEach((n) => {
+      const F = ativos.filter((c) => c.nivel === n && c.genero === 'F'), Mm = ativos.filter((c) => c.nivel === n && c.genero === 'M');
+      if (F.length >= 3 && Mm.length >= 3) {
+        const gap = avg(F, (c) => c.compaRatio) / avg(Mm, (c) => c.compaRatio) - 1;
+        somaGap += gap * (F.length + Mm.length); pesoGap += F.length + Mm.length;
+        if (gap < 0) custoCorrecao += sum(F, (c) => c.salario) * -gap * 13.33 * FATOR_ENCARGOS;
+      }
+    });
+    const clima = f.clima;
+    const ciclos = [...new Set(clima.map((c) => c.ciclo))].sort();
+    const cicloAtual = ciclos[ciclos.length - 1], cicloAnt = ciclos[ciclos.length - 2];
+    const favMedia = (ciclo, dim) => { const x = clima.filter((c) => c.ciclo === ciclo && (!dim || c.dimensao === dim)); return x.length ? sum(x, (c) => c.fav * c.respondentes) / sum(x, (c) => c.respondentes) : null; };
+    const dims = [...new Set(clima.map((c) => c.dimensao))].map((d) => ({ dimensao: d, atual: favMedia(cicloAtual, d), anterior: cicloAnt ? favMedia(cicloAnt, d) : null })).sort((a, b) => a.atual - b.atual);
+    const lic = f.licencas;
+    const b31 = lic.filter((l) => /B31/.test(l.tipo));
+    const org = orgDesign(base, areaId);
+    const porTribo = {};
+    f.tribos.forEach((t) => {
+      const m = ativos.filter((c) => c.tribo === t.id);
+      if (m.length) porTribo[t.id] = {
+        hc: m.length, enps: Math.round((m.filter((c) => c.enps >= 9).length - m.filter((c) => c.enps <= 6).length) / m.length * 100),
+        risco: avg(m, (c) => c.risco || 0), he: avg(m, (c) => c.heMes), receitaFTE: t.receita ? t.receita * 1e6 / m.length : null, fav: (() => { const x = clima.filter((c) => c.tribo === t.id && c.ciclo === cicloAtual); return x.length ? avg(x, (c) => c.fav) : null; })()
+      };
+    });
+    const funil = ['Assistente', 'Analista Jr', 'Analista Pl', 'Analista Sr', 'Especialista', 'Coordenador', 'Gerente', 'Superintendente', 'Diretor']
+      .map((n) => { const x = ativos.filter((c) => c.nivel === n); return { nivel: n, n: x.length, mulheres: x.length ? x.filter((c) => c.genero === 'F').length / x.length : null, negros: x.length ? x.filter((c) => c.raca === 'Negra').length / x.length : null }; })
+      .filter((x) => x.n);
+    const talentDensity = ativos.filter((c) => c.desempenho >= 4).length / hc;
+    const burnout = ativos.filter((c) => c.heMes > 20 || (c.absenteismo > 10 && c.enps <= 6)).length / hc;
+    const favAtual = favMedia(cicloAtual);
+    const sucessao = (() => { const ch = ativos.filter((c) => c.posicaoChave); return ch.length ? ch.filter((c) => c.sucessorPronto).length / ch.length : 0; })();
+    const turnVol = desligados.filter((c) => c.tipoDesligamento === 'Voluntário').length / hcMedio;
+    // Org Health Index (0–100): média de dimensões normalizadas
+    const ohiPartes = {
+      Engajamento: favAtual || 60, Retenção: Math.max(0, 100 - turnVol * 400), 'Talent density': Math.min(100, talentDensity / 0.4 * 100),
+      Sucessão: sucessao * 100, Liderança: avg(org.gestores, (g) => g.mei) || 60, 'Bem-estar': Math.max(0, 100 - burnout * 300)
+    };
+    return {
+      receita, receitaFTE: hcTribosRec.length ? receita / hcTribosRec.length : null,
+      hcRoi: folhaRec ? (receita - (custoOp - folhaRec)) / folhaRec : null, custoPessoasReceita: receita ? folhaRec / receita : null, folhaAnual,
+      talentDensity, regrettedRate: desligados.filter((c) => c.regretted).length / hcMedio, turnoverVol: turnVol,
+      earlyAttrition: contratados.length ? desligados.filter((c) => c.tempoCasaMeses < 12).length / contratados.length : 0,
+      qualityOfHire: (() => { const x = ativos.filter((c) => c.tempoCasaMeses < 12 && c.tempoCasaMeses >= 3); return x.length ? x.filter((c) => c.desempenho >= 4).length / x.length : null; })(),
+      promocao: ativos.filter((c) => c.promovido12m).length / hc,
+      mobilidade: { internalFill: transf + adm ? transf / (transf + adm) : 0, transferencias: transf, admissoes: adm, taxa: (ativos.filter((c) => c.transferido12m || c.promovido12m).length) / hc },
+      burnout, horasTreino: avg(ativos, (c) => c.horasTreinamento || 0),
+      equidade: { gapAjustado: pesoGap ? somaGap / pesoGap : 0, custoCorrecao },
+      ia: { alta: ativos.filter((c) => (c.exposicaoIA || 0) >= 0.6).length, pctAlta: ativos.filter((c) => (c.exposicaoIA || 0) >= 0.6).length / hc, media: avg(ativos, (c) => c.exposicaoIA || 0) },
+      clima: { cicloAtual, cicloAnt, favAtual, favAnterior: cicloAnt ? favMedia(cicloAnt) : null, dims },
+      saude: {
+        licencas: lic.length, b31: b31.length, pctMental: b31.length ? b31.filter((l) => /mental/i.test(l.grupo || '')).length / b31.length : 0,
+        diasPerdidos: sum(lic.filter((l) => /B31|B91/.test(l.tipo)), (l) => l.dias), porTipo: [...new Set(lic.map((l) => l.tipo))].map((t) => ({ tipo: t, n: lic.filter((l) => l.tipo === t).length, dias: sum(lic.filter((l) => l.tipo === t), (l) => l.dias) })),
+        porGrupo: [...new Set(b31.map((l) => l.grupo))].map((g) => ({ grupo: g, n: b31.filter((l) => l.grupo === g).length }))
+      },
+      spans: { medio: org.medio, gestores: org.gestoresN, pctEstreito: org.pctEstreito, pctLargo: org.pctLargo, camadas: org.camadas, custoEstreitos: org.custoEstreitos },
+      managerIndex: avg(org.gestores, (g) => g.mei), funil, porTribo, ohi: avg(Object.values(ohiPartes)), ohiPartes
+    };
+  }
+
   global.BPAnalytics = {
     CONFIG, FEATURES, FATOR_ENCARGOS, NOMES_9BOX, PLAYBOOKS,
-    preparar, treinarModelo, pontuar, filtrar, kpis, wfp, simularRetencao, insights, caixa9, faixaRisco, custoReposicao,
+    preparar, treinarModelo, pontuar, filtrar, setTribo, kpis, estrategicos, orgDesign, nomeTribo, wfp, simularRetencao, insights, caixa9, faixaRisco, custoReposicao,
     fmt: { brl, p100, dec }, util: { sum, avg, pct }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

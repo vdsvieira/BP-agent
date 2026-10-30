@@ -1,0 +1,8 @@
+{
+  "sap": {"modo": "simulado"},
+  "movimentacoes": {"modo": "simulado"},
+  "ats": {"modo": "simulado"},
+  "clima": {"modo": "simulado"},
+  "datalake": {"modo": "simulado"},
+  "negocio": {"modo": "simulado"}
+}
