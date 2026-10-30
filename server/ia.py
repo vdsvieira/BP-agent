@@ -82,6 +82,9 @@ def explicar_erro(e: Exception) -> tuple[int, str]:
     if isinstance(e, anthropic.APIStatusError) and "<html" in str(e).lower():
         return 502, (f"A rede corporativa devolveu uma página de bloqueio ({e.status_code}) em vez da resposta da API — "
                      "proxy/firewall filtrando api.anthropic.com. Não é problema da chave: peça a liberação à TI.")
+    if isinstance(e, anthropic.BadRequestError) and "credit balance" in str(e).lower():
+        return 402, ("A chave funciona, mas a conta da API está SEM CRÉDITOS. Compre créditos em console.anthropic.com → "
+                     "Plans & Billing (a API é cobrada à parte da assinatura do Claude) e tente de novo — não precisa reiniciar.")
     if isinstance(e, anthropic.AuthenticationError):
         return 503, f"A API recusou a credencial (401): chave inválida, revogada ou login 'ant' expirado. Gere uma nova chave e reinicie o servidor.{sufixo}"
     if isinstance(e, anthropic.PermissionDeniedError):
