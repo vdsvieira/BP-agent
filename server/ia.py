@@ -24,8 +24,9 @@ _origem: list = []  # memoriza de onde veio a credencial na primeira leitura
 
 
 def carregar_env() -> str | None:
-    """Lê ANTHROPIC_API_KEY (e variáveis de proxy) de um arquivo .env na raiz, se a variável não estiver no ambiente.
-    Retorna a origem da credencial: 'ambiente', '.env', 'perfil ant' ou None."""
+    """Carrega o arquivo .env da pasta do cockpit. O .env TEM PRIORIDADE sobre variáveis do Windows (setx):
+    é a configuração específica deste app, e evita que uma chave antiga esquecida no sistema seja usada.
+    Retorna a origem da credencial: '.env', 'ambiente', 'perfil ant' ou None."""
     if _origem:
         return _origem[0]
     _origem.append(_detectar_origem())
@@ -33,18 +34,25 @@ def carregar_env() -> str | None:
 
 
 def _detectar_origem() -> str | None:
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return "ambiente"
     arq = RAIZ / ".env"
     if arq.exists():
         for linha in arq.read_text(encoding="utf-8-sig").splitlines():
             linha = linha.strip()
             if linha and not linha.startswith("#") and "=" in linha:
                 k, v = linha.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-        if os.environ.get("ANTHROPIC_API_KEY"):
+                v = v.strip().strip('"').strip("'")
+                if v and "sua-chave-aqui" not in v:  # ignora o valor de exemplo
+                    os.environ[k.strip()] = v
+        if os.environ.get("ANTHROPIC_API_KEY") and _chave_do_env(arq):
             return ".env"
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+        return "ambiente (variável do Windows/setx)"
     return "perfil ant" if os.environ.get("ANTHROPIC_PROFILE") else None
+
+
+def _chave_do_env(arq: Path) -> bool:
+    return any(l.strip().startswith("ANTHROPIC_API_KEY=") and "sua-chave-aqui" not in l and l.split("=", 1)[1].strip()
+               for l in arq.read_text(encoding="utf-8-sig").splitlines())
 
 
 def cliente() -> anthropic.Anthropic:
@@ -104,7 +112,7 @@ def registrar_erro(contexto: str, e: Exception) -> None:
 
 def status_credencial() -> str:
     origem = carregar_env()
-    if origem in ("ambiente", ".env"):
+    if origem and origem != "perfil ant":
         chave = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
         return f"credencial encontrada via {origem} ({_mascarar(chave)})"
     if origem:

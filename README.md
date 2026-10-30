@@ -116,7 +116,7 @@ O cockpit mostra a **causa real** do erro: chave ausente ou recusada, bloqueio d
 
 Para checar tudo de uma vez, dê duplo clique em `diagnostico.bat` (ou rode `python -m server --diagnostico`). O teste verifica a chave, o proxy e faz três chamadas mínimas à API.
 
-Se o `setx` não "pegar" em algumas aberturas, copie `.env.exemplo` para `.env` e cole a chave nele. É lido automaticamente e nunca vai para o Git. Se a TI indicar um proxy, ele também é configurado no `.env`.
+Se o `setx` não "pegar" em algumas aberturas, copie `.env.exemplo` para `.env` e cole a chave nele. É lido automaticamente, **tem prioridade sobre o `setx`** e nunca vai para o Git. Se a TI indicar um proxy, ele também é configurado no `.env`.
 
 ## Governança e LGPD
 
